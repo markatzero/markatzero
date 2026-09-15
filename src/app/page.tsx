@@ -11,50 +11,119 @@ import {
 const geoUrl =
   "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
-const marks: { id: number; coordinates: [number, number]; color: string }[] = [
-  { id: 1, coordinates: [-122.4, 37.8], color: "#22d3ee" },
-  { id: 2, coordinates: [-118.2, 34.1], color: "#a78bfa" },
-  { id: 3, coordinates: [-74, 40.7], color: "#38bdf8" },
-  { id: 4, coordinates: [-99.1, 19.4], color: "#c084fc" },
-  { id: 5, coordinates: [-46.6, -23.5], color: "#22d3ee" },
-  { id: 6, coordinates: [-58.4, -34.6], color: "#818cf8" },
-  { id: 7, coordinates: [-0.1, 51.5], color: "#67e8f9" },
-  { id: 8, coordinates: [2.35, 48.85], color: "#a78bfa" },
-  { id: 9, coordinates: [13.4, 52.5], color: "#22d3ee" },
-  { id: 10, coordinates: [12.5, 41.9], color: "#818cf8" },
-  { id: 11, coordinates: [31.2, 30], color: "#c084fc" },
-  { id: 12, coordinates: [3.4, 6.5], color: "#22d3ee" },
-  { id: 13, coordinates: [28, -26.2], color: "#38bdf8" },
-  { id: 14, coordinates: [55.3, 25.2], color: "#a78bfa" },
-  { id: 15, coordinates: [72.8, 19.1], color: "#22d3ee" },
-  { id: 16, coordinates: [77.2, 28.6], color: "#818cf8" },
-  { id: 17, coordinates: [100.5, 13.7], color: "#c084fc" },
-  { id: 18, coordinates: [103.8, 1.35], color: "#22d3ee" },
-  { id: 19, coordinates: [116.4, 39.9], color: "#38bdf8" },
-  { id: 20, coordinates: [121.5, 31.2], color: "#a78bfa" },
-  { id: 21, coordinates: [139.7, 35.7], color: "#22d3ee" },
-  { id: 22, coordinates: [126.9, 37.5], color: "#818cf8" },
-  { id: 23, coordinates: [151.2, -33.9], color: "#c084fc" },
-  { id: 24, coordinates: [144.9, -37.8], color: "#22d3ee" },
+type Mark = {
+  id: number;
+  coordinates: [number, number];
+  color: string;
+  size: number;
+};
+
+const cities: [number, number][] = [
+  [-122.4, 37.8],
+  [-118.2, 34.1],
+  [-87.6, 41.8],
+  [-74, 40.7],
+  [-99.1, 19.4],
+  [-79.4, 43.7],
+  [-46.6, -23.5],
+  [-43.2, -22.9],
+  [-58.4, -34.6],
+  [-70.7, -33.4],
+  [-0.1, 51.5],
+  [2.35, 48.85],
+  [4.9, 52.3],
+  [13.4, 52.5],
+  [12.5, 41.9],
+  [-3.7, 40.4],
+  [18.1, 59.3],
+  [30.5, 50.4],
+  [28.9, 41],
+  [31.2, 30],
+  [3.4, 6.5],
+  [36.8, -1.3],
+  [28, -26.2],
+  [18.4, -33.9],
+  [55.3, 25.2],
+  [46.7, 24.7],
+  [51.5, 25.3],
+  [44.4, 33.3],
+  [51.4, 35.7],
+  [72.8, 19.1],
+  [77.2, 28.6],
+  [77.6, 12.9],
+  [88.4, 22.6],
+  [90.4, 23.8],
+  [100.5, 13.7],
+  [103.8, 1.35],
+  [106.8, -6.2],
+  [106.6, 10.8],
+  [116.4, 39.9],
+  [121.5, 31.2],
+  [114.2, 22.3],
+  [121, 14.6],
+  [126.9, 37.5],
+  [139.7, 35.7],
+  [135.5, 34.7],
+  [151.2, -33.9],
+  [144.9, -37.8],
+  [174.8, -36.8],
+];
+
+const colors = [
+  "#22d3ee",
+  "#38bdf8",
+  "#818cf8",
+  "#a78bfa",
+  "#c084fc",
+  "#67e8f9",
+];
+
+const marks: Mark[] = Array.from({ length: 190 }, (_, index) => {
+  const base = cities[index % cities.length];
+
+  const offsetX =
+    (((index * 37) % 17) - 8) * 0.65;
+
+  const offsetY =
+    (((index * 23) % 13) - 6) * 0.45;
+
+  return {
+    id: index + 1,
+    coordinates: [
+      base[0] + offsetX,
+      base[1] + offsetY,
+    ],
+    color: colors[index % colors.length],
+    size: 1.5 + (index % 4) * 0.45,
+  };
+});
+
+const topCountries = [
+  ["01", "United States", "31,482"],
+  ["02", "Brazil", "18,921"],
+  ["03", "Japan", "16,540"],
+  ["04", "Germany", "14,287"],
+  ["05", "United Kingdom", "12,804"],
 ];
 
 const recentMarks = [
-  { number: "#184392", country: "Japan", symbol: "✦" },
-  { number: "#184391", country: "Brazil", symbol: "●" },
-  { number: "#184390", country: "Germany", symbol: "▲" },
-  { number: "#184389", country: "Canada", symbol: "◆" },
+  ["#184392", "Japan", "✦"],
+  ["#184391", "Brazil", "●"],
+  ["#184390", "Germany", "▲"],
+  ["#184389", "Canada", "◆"],
 ];
 
 export default function Home() {
   return (
     <main className="min-h-screen bg-[#02050d] text-white">
-      <header className="border-b border-white/[0.07] bg-[#02050d]/90">
+      <header className="border-b border-white/[0.07] bg-[#02050d]">
         <div className="mx-auto flex max-w-[1500px] items-center justify-between px-5 py-5 md:px-8">
           <div className="flex items-center gap-5">
             <div>
               <div className="text-3xl font-semibold tracking-[0.08em] md:text-4xl">
                 00:00:00
               </div>
+
               <div className="mt-1 text-[8px] tracking-[0.34em] text-cyan-300/70">
                 MARK AT ZERO
               </div>
@@ -89,6 +158,7 @@ export default function Home() {
             <p className="text-[8px] tracking-[0.28em] text-slate-500">
               PEOPLE
             </p>
+
             <p className="mt-1 text-lg font-medium md:text-xl">
               184,392
               <span className="ml-2 hidden text-[10px] font-normal text-slate-600 sm:inline">
@@ -101,6 +171,7 @@ export default function Home() {
             <p className="text-[8px] tracking-[0.28em] text-slate-500">
               COUNTRIES
             </p>
+
             <p className="mt-1 text-lg font-medium md:text-xl">
               142
               <span className="ml-2 text-[10px] font-normal text-slate-600">
@@ -113,6 +184,7 @@ export default function Home() {
             <p className="text-[8px] tracking-[0.28em] text-slate-500">
               MARKS
             </p>
+
             <p className="mt-1 text-lg font-medium md:text-xl">
               184,392
               <span className="ml-2 hidden text-[9px] font-normal text-cyan-400 sm:inline">
@@ -124,13 +196,15 @@ export default function Home() {
 
         <div className="grid gap-4 xl:grid-cols-[1fr_230px]">
           <div className="relative h-[610px] overflow-hidden rounded-2xl border border-white/[0.08] bg-[#030914]">
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(14,165,233,0.10),transparent_55%)]" />
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(14,165,233,0.13),transparent_58%)]" />
+
             <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.018)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.018)_1px,transparent_1px)] bg-[size:40px_40px]" />
 
             <div className="absolute left-5 top-5 z-20">
               <p className="text-[9px] tracking-[0.34em] text-cyan-300">
                 THE WORLD
               </p>
+
               <p className="mt-2 text-[9px] tracking-wider text-slate-600">
                 DRAG · ZOOM · DISCOVER
               </p>
@@ -165,9 +239,9 @@ export default function Home() {
                         <Geography
                           key={geo.rsmKey}
                           geography={geo}
-                          fill="#071522"
+                          fill="#06111c"
                           stroke="#164e63"
-                          strokeWidth={0.45}
+                          strokeWidth={0.38}
                         />
                       ))
                     }
@@ -179,15 +253,15 @@ export default function Home() {
                       coordinates={mark.coordinates}
                     >
                       <circle
-                        r={7}
+                        r={mark.size * 2.7}
                         fill={mark.color}
-                        opacity={0.12}
+                        opacity={0.07}
                       />
+
                       <circle
-                        r={3}
+                        r={mark.size}
                         fill={mark.color}
-                        stroke="#ffffff"
-                        strokeWidth={0.55}
+                        opacity={0.95}
                       />
                     </Marker>
                   ))}
@@ -199,6 +273,7 @@ export default function Home() {
               <p className="text-[8px] tracking-wider text-slate-500">
                 LIVE WORLD
               </p>
+
               <p className="mt-1 text-[10px] text-cyan-300">
                 184,392 marks connected
               </p>
@@ -219,17 +294,14 @@ export default function Home() {
               <p className="text-[9px] tracking-[0.25em] text-slate-400">
                 TOP COUNTRIES
               </p>
-              <span className="text-[9px] text-slate-600">LIVE</span>
+
+              <span className="text-[9px] text-cyan-400/60">
+                LIVE
+              </span>
             </div>
 
             <div className="mt-6 space-y-5 text-xs">
-              {[
-                ["01", "United States", "31,482"],
-                ["02", "Brazil", "18,921"],
-                ["03", "Japan", "16,540"],
-                ["04", "Germany", "14,287"],
-                ["05", "United Kingdom", "12,804"],
-              ].map(([rank, country, total]) => (
+              {topCountries.map(([rank, country, total]) => (
                 <div
                   key={country}
                   className="flex items-center justify-between border-b border-white/[0.05] pb-4"
@@ -238,10 +310,12 @@ export default function Home() {
                     <span className="text-[9px] text-slate-600">
                       {rank}
                     </span>
+
                     <span className="text-[11px] text-slate-300">
                       {country}
                     </span>
                   </div>
+
                   <span className="text-[10px] text-cyan-300/80">
                     {total}
                   </span>
@@ -260,27 +334,29 @@ export default function Home() {
             <p className="text-[9px] tracking-[0.25em] text-slate-500">
               RECENT MARKS
             </p>
+
             <p className="text-[8px] tracking-wider text-cyan-400/60">
               LIVE
             </p>
           </div>
 
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-            {recentMarks.map((mark) => (
+            {recentMarks.map(([number, country, symbol]) => (
               <div
-                key={mark.number}
+                key={number}
                 className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.025] p-3"
               >
                 <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-cyan-400/20 bg-cyan-400/[0.06] text-cyan-300">
-                  {mark.symbol}
+                  {symbol}
                 </div>
 
                 <div>
                   <p className="text-[10px] text-slate-300">
-                    {mark.number}
+                    {number}
                   </p>
+
                   <p className="mt-1 text-[8px] tracking-wider text-slate-600">
-                    {mark.country}
+                    {country}
                   </p>
                 </div>
               </div>
