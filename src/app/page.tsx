@@ -1,76 +1,24 @@
 "use client";
 
-import { ChangeEvent, useEffect, useState } from "react";
+import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import {
   ComposableMap,
   Geographies,
   Geography,
-  Marker,
   ZoomableGroup,
 } from "react-simple-maps";
 
 const geoUrl =
   "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
-type Mark = {
+type PaidMark = {
   id: number;
-  coordinates: [number, number];
-  color: string;
-  size: number;
+  created_at: string;
+  country: string;
+  message: string | null;
+  image_url: string;
+  mark_number: number;
 };
-
-const cities: [number, number][] = [
-  [-122.4, 37.8], [-118.2, 34.1], [-87.6, 41.8], [-74, 40.7],
-  [-99.1, 19.4], [-79.4, 43.7], [-46.6, -23.5], [-43.2, -22.9],
-  [-58.4, -34.6], [-70.7, -33.4], [-0.1, 51.5], [2.35, 48.85],
-  [4.9, 52.3], [13.4, 52.5], [12.5, 41.9], [-3.7, 40.4],
-  [18.1, 59.3], [30.5, 50.4], [28.9, 41], [31.2, 30],
-  [3.4, 6.5], [36.8, -1.3], [28, -26.2], [18.4, -33.9],
-  [55.3, 25.2], [46.7, 24.7], [51.5, 25.3], [44.4, 33.3],
-  [51.4, 35.7], [72.8, 19.1], [77.2, 28.6], [77.6, 12.9],
-  [88.4, 22.6], [90.4, 23.8], [100.5, 13.7], [103.8, 1.35],
-  [106.8, -6.2], [106.6, 10.8], [116.4, 39.9], [121.5, 31.2],
-  [114.2, 22.3], [121, 14.6], [126.9, 37.5], [139.7, 35.7],
-  [135.5, 34.7], [151.2, -33.9], [144.9, -37.8], [174.8, -36.8],
-];
-
-const colors = [
-  "#22d3ee",
-  "#38bdf8",
-  "#818cf8",
-  "#a78bfa",
-  "#c084fc",
-  "#67e8f9",
-];
-
-const marks: Mark[] = Array.from({ length: 190 }, (_, index) => {
-  const base = cities[index % cities.length];
-
-  return {
-    id: index + 1,
-    coordinates: [
-      base[0] + (((index * 37) % 17) - 8) * 0.65,
-      base[1] + (((index * 23) % 13) - 6) * 0.45,
-    ],
-    color: colors[index % colors.length],
-    size: 1.5 + (index % 4) * 0.45,
-  };
-});
-
-const topCountries = [
-  ["01", "United States", "31,482"],
-  ["02", "Brazil", "18,921"],
-  ["03", "Japan", "16,540"],
-  ["04", "Germany", "14,287"],
-  ["05", "United Kingdom", "12,804"],
-];
-
-const recentMarks = [
-  ["#184392", "Japan", "✦"],
-  ["#184391", "Brazil", "●"],
-  ["#184390", "Germany", "▲"],
-  ["#184389", "Canada", "◆"],
-];
 
 const countries = [
   "Afghanistan",
@@ -271,6 +219,9 @@ const countries = [
 ];
 
 export default function Home() {
+  const [paidMarks, setPaidMarks] = useState<PaidMark[]>([]);
+  const [dataError, setDataError] = useState("");
+
   const [joinOpen, setJoinOpen] = useState(false);
   const [step, setStep] = useState<"create" | "review">("create");
 
@@ -285,12 +236,54 @@ export default function Home() {
   const [savedMarkId, setSavedMarkId] = useState<number | null>(null);
 
   useEffect(() => {
+    async function loadPaidMarks() {
+      try {
+        const response = await fetch("/api/marks", {
+          cache: "no-store",
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.error || "Could not load marks.");
+        }
+
+        setPaidMarks(Array.isArray(result.marks) ? result.marks : []);
+      } catch (error) {
+        setDataError(
+          error instanceof Error ? error.message : "Could not load marks."
+        );
+      }
+    }
+
+    loadPaidMarks();
+  }, []);
+
+  useEffect(() => {
     return () => {
       if (markPreview) {
         URL.revokeObjectURL(markPreview);
       }
     };
   }, [markPreview]);
+
+  const totalMarks = paidMarks.length;
+
+  const countryTotals = useMemo(() => {
+    const totals = new Map<string, number>();
+
+    paidMarks.forEach((mark) => {
+      totals.set(mark.country, (totals.get(mark.country) ?? 0) + 1);
+    });
+
+    return Array.from(totals.entries())
+      .map(([name, total]) => ({ name, total }))
+      .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
+  }, [paidMarks]);
+
+  const totalCountries = countryTotals.length;
+  const topCountries = countryTotals.slice(0, 5);
+  const recentMarks = paidMarks.slice(0, 4);
 
   function openJoin() {
     setStep("create");
@@ -317,12 +310,7 @@ export default function Home() {
 
     if (!file) return;
 
-    const allowedTypes = [
-      "image/jpeg",
-      "image/png",
-      "image/webp",
-    ];
-
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
     const maxFileSize = 15 * 1024 * 1024;
 
     if (!allowedTypes.includes(file.type)) {
@@ -462,7 +450,7 @@ export default function Home() {
             </p>
 
             <p className="mt-1 text-lg font-medium md:text-xl">
-              184,392
+              {totalMarks.toLocaleString()}
               <span className="ml-2 hidden text-[10px] font-normal text-slate-600 sm:inline">
                 / 1,000,000
               </span>
@@ -475,7 +463,7 @@ export default function Home() {
             </p>
 
             <p className="mt-1 text-lg font-medium md:text-xl">
-              142
+              {totalCountries.toLocaleString()}
               <span className="ml-2 text-[10px] font-normal text-slate-600">
                 / 195
               </span>
@@ -488,13 +476,19 @@ export default function Home() {
             </p>
 
             <p className="mt-1 text-lg font-medium md:text-xl">
-              184,392
+              {totalMarks.toLocaleString()}
               <span className="ml-2 hidden text-[9px] font-normal text-cyan-400 sm:inline">
                 AND GROWING
               </span>
             </p>
           </div>
         </div>
+
+        {dataError && (
+          <div className="mb-4 rounded-xl border border-red-400/20 bg-red-400/[0.05] px-4 py-3 text-center text-[10px] text-red-300">
+            LIVE DATA COULD NOT BE LOADED
+          </div>
+        )}
 
         <div className="grid gap-4 xl:grid-cols-[1fr_230px]">
           <div className="relative h-[610px] overflow-hidden rounded-2xl border border-white/[0.08] bg-[#030914]">
@@ -548,22 +542,6 @@ export default function Home() {
                       ))
                     }
                   </Geographies>
-
-                  {marks.map((mark) => (
-                    <Marker key={mark.id} coordinates={mark.coordinates}>
-                      <circle
-                        r={mark.size * 2.7}
-                        fill={mark.color}
-                        opacity={0.07}
-                      />
-
-                      <circle
-                        r={mark.size}
-                        fill={mark.color}
-                        opacity={0.95}
-                      />
-                    </Marker>
-                  ))}
                 </ZoomableGroup>
               </ComposableMap>
             </div>
@@ -574,7 +552,7 @@ export default function Home() {
               </p>
 
               <p className="mt-1 text-[10px] text-cyan-300">
-                184,392 marks connected
+                {totalMarks.toLocaleString()} marks connected
               </p>
             </div>
 
@@ -595,32 +573,36 @@ export default function Home() {
                 TOP COUNTRIES
               </p>
 
-              <span className="text-[9px] text-cyan-400/60">
-                LIVE
-              </span>
+              <span className="text-[9px] text-cyan-400/60">LIVE</span>
             </div>
 
             <div className="mt-6 space-y-5 text-xs">
-              {topCountries.map(([rank, itemCountry, total]) => (
-                <div
-                  key={itemCountry}
-                  className="flex items-center justify-between border-b border-white/[0.05] pb-4"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-[9px] text-slate-600">
-                      {rank}
-                    </span>
+              {topCountries.length > 0 ? (
+                topCountries.map((item, index) => (
+                  <div
+                    key={item.name}
+                    className="flex items-center justify-between border-b border-white/[0.05] pb-4"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-[9px] text-slate-600">
+                        {String(index + 1).padStart(2, "0")}
+                      </span>
 
-                    <span className="text-[11px] text-slate-300">
-                      {itemCountry}
+                      <span className="text-[11px] text-slate-300">
+                        {item.name}
+                      </span>
+                    </div>
+
+                    <span className="text-[10px] text-cyan-300/80">
+                      {item.total.toLocaleString()}
                     </span>
                   </div>
-
-                  <span className="text-[10px] text-cyan-300/80">
-                    {total}
-                  </span>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-[10px] leading-5 text-slate-600">
+                  NO PAID MARKS YET.
+                </p>
+              )}
             </div>
 
             <p className="mt-7 text-[8px] leading-5 tracking-wider text-slate-600">
@@ -640,28 +622,38 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-            {recentMarks.map(([number, itemCountry, symbol]) => (
-              <div
-                key={number}
-                className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.025] p-3"
-              >
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-cyan-400/20 bg-cyan-400/[0.06] text-cyan-300">
-                  {symbol}
-                </div>
+          {recentMarks.length > 0 ? (
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              {recentMarks.map((mark) => (
+                <div
+                  key={mark.id}
+                  className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.025] p-3"
+                >
+                  <div className="h-9 w-9 shrink-0 overflow-hidden rounded-lg border border-cyan-400/20 bg-cyan-400/[0.06]">
+                    <img
+                      src={mark.image_url}
+                      alt={`Mark #${mark.mark_number}`}
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
 
-                <div>
-                  <p className="text-[10px] text-slate-300">
-                    {number}
-                  </p>
+                  <div className="min-w-0">
+                    <p className="text-[10px] text-slate-300">
+                      #{mark.mark_number}
+                    </p>
 
-                  <p className="mt-1 text-[8px] tracking-wider text-slate-600">
-                    {itemCountry}
-                  </p>
+                    <p className="mt-1 truncate text-[8px] tracking-wider text-slate-600">
+                      {mark.country}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <p className="py-4 text-center text-[10px] text-slate-600">
+              NO PAID MARKS YET.
+            </p>
+          )}
         </div>
 
         <div className="py-8 text-center">
@@ -849,9 +841,7 @@ export default function Home() {
                         ONE MARK
                       </p>
 
-                      <p className="mt-1 text-lg font-medium">
-                        €1
-                      </p>
+                      <p className="mt-1 text-lg font-medium">€1</p>
                     </div>
 
                     <button
@@ -909,9 +899,7 @@ export default function Home() {
                             PRICE
                           </p>
 
-                          <p className="mt-2 text-sm text-white">
-                            €1
-                          </p>
+                          <p className="mt-2 text-sm text-white">€1</p>
                         </div>
                       </div>
 
@@ -965,7 +953,7 @@ export default function Home() {
                   )}
 
                   <p className="mt-5 text-center text-[8px] leading-4 tracking-wider text-slate-700">
-                    DEVELOPMENT TEST ONLY · IMAGE UPLOAD AND PAYMENT ARE NOT ACTIVE YET.
+                    DEVELOPMENT TEST ONLY · PAYMENT BUTTON COMES NEXT.
                   </p>
                 </>
               )}
