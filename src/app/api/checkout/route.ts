@@ -24,6 +24,8 @@ export async function POST(request: Request) {
       );
     }
 
+    const origin = new URL(request.url).origin;
+
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       line_items: [
@@ -35,8 +37,8 @@ export async function POST(request: Request) {
       metadata: {
         mark_id: String(markId),
       },
-      success_url: `http://localhost:3000/?payment=success&mark=${markId}`,
-      cancel_url: `http://localhost:3000/?payment=cancelled&mark=${markId}`,
+      success_url: `${origin}/?payment=success&mark=${markId}`,
+      cancel_url: `${origin}/?payment=cancelled&mark=${markId}`,
     });
 
     return NextResponse.json({ url: session.url });
