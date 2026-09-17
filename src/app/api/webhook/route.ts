@@ -45,19 +45,48 @@ export async function POST(request: Request) {
         markId > 0 &&
         session.payment_status === "paid"
       ) {
-        const { error } = await supabaseAdmin
+        const { data: mark, error: markError } = await supabaseAdmin
           .from("marks")
-          .update({
-            status: "paid",
-            payment_id: session.payment_intent
-              ? String(session.payment_intent)
-              : session.id,
-          })
+          .select("id, status, mark_number")
           .eq("id", markId)
-          .eq("status", "pending");
+          .single();
 
-        if (error) {
-          throw error;
+        if (markError) {
+          throw markError;
+        }
+
+        if (mark.status === "pending") {
+          const { data: lastMark, error: lastMarkError } =
+            await supabaseAdmin
+              .from("marks")
+              .select("mark_number")
+              .not("mark_number", "is", null)
+              .order("mark_number", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
+          if (lastMarkError) {
+            throw lastMarkError;
+          }
+
+          const nextMarkNumber =
+            (lastMark?.mark_number ?? 0) + 1;
+
+          const { error: updateError } = await supabaseAdmin
+            .from("marks")
+            .update({
+              status: "paid",
+              payment_id: session.payment_intent
+                ? String(session.payment_intent)
+                : session.id,
+              mark_number: nextMarkNumber,
+            })
+            .eq("id", markId)
+            .eq("status", "pending");
+
+          if (updateError) {
+            throw updateError;
+          }
         }
       }
     }
@@ -67,6 +96,9 @@ export async function POST(request: Request) {
     const message =
       error instanceof Error ? error.message : "Webhook failed.";
 
-    return NextResponse.json({ error: message }, { status: 400 });
+    return NextResponse.json(
+      { error: message },
+      { status: 400 }
+    );
   }
 }
