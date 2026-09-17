@@ -233,7 +233,6 @@ export default function Home() {
 
   const [formError, setFormError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [savedMarkId, setSavedMarkId] = useState<number | null>(null);
 
   useEffect(() => {
     async function loadPaidMarks() {
@@ -289,7 +288,6 @@ export default function Home() {
     setStep("create");
     setFormError("");
     setIsSubmitting(false);
-    setSavedMarkId(null);
     setJoinOpen(true);
   }
 
@@ -302,7 +300,6 @@ export default function Home() {
     setMarkPreview(null);
     setFormError("");
     setIsSubmitting(false);
-    setSavedMarkId(null);
   }
 
   function handleMarkFile(event: ChangeEvent<HTMLInputElement>) {
@@ -366,8 +363,8 @@ export default function Home() {
     setStep("review");
   }
 
-  async function saveTestMark() {
-    if (isSubmitting || savedMarkId !== null) return;
+  async function startCheckout() {
+    if (isSubmitting) return;
 
     setIsSubmitting(true);
     setFormError("");
@@ -382,23 +379,40 @@ export default function Home() {
       formData.append("message", message);
       formData.append("image", markFile);
 
-      const response = await fetch("/api/marks", {
+      const markResponse = await fetch("/api/marks", {
         method: "POST",
         body: formData,
       });
 
-      const result = await response.json();
+      const markResult = await markResponse.json();
 
-      if (!response.ok) {
-        throw new Error(result.error || "Could not save your mark.");
+      if (!markResponse.ok || !markResult.mark?.id) {
+        throw new Error(markResult.error || "Could not prepare your mark.");
       }
 
-      setSavedMarkId(result.mark.id);
+      const checkoutResponse = await fetch("/api/checkout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          markId: markResult.mark.id,
+        }),
+      });
+
+      const checkoutResult = await checkoutResponse.json();
+
+      if (!checkoutResponse.ok || !checkoutResult.url) {
+        throw new Error(
+          checkoutResult.error || "Could not start secure checkout."
+        );
+      }
+
+      window.location.href = checkoutResult.url;
     } catch (error) {
       setFormError(
-        error instanceof Error ? error.message : "Could not save your mark."
+        error instanceof Error ? error.message : "Could not start checkout."
       );
-    } finally {
       setIsSubmitting(false);
     }
   }
@@ -928,15 +942,13 @@ export default function Home() {
 
                     <button
                       type="button"
-                      onClick={saveTestMark}
-                      disabled={isSubmitting || savedMarkId !== null}
+                      onClick={startCheckout}
+                      disabled={isSubmitting}
                       className="rounded-full bg-white px-7 py-3 text-xs font-semibold tracking-wide text-black transition disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      {savedMarkId !== null
-                        ? "MARK SAVED"
-                        : isSubmitting
-                          ? "SAVING..."
-                          : "TEST SAVE"}
+                      {isSubmitting
+                        ? "PREPARING PAYMENT..."
+                        : "PAY €1 & LEAVE YOUR MARK"}
                     </button>
                   </div>
 
@@ -946,14 +958,10 @@ export default function Home() {
                     </div>
                   )}
 
-                  {savedMarkId !== null && (
-                    <div className="mt-5 rounded-xl border border-cyan-300/20 bg-cyan-300/[0.05] px-4 py-3 text-center text-[10px] text-cyan-200">
-                      TEST MARK SAVED · DATABASE ID #{savedMarkId}
-                    </div>
-                  )}
+
 
                   <p className="mt-5 text-center text-[8px] leading-4 tracking-wider text-slate-700">
-                    DEVELOPMENT TEST ONLY · PAYMENT BUTTON COMES NEXT.
+                    SECURE CHECKOUT POWERED BY STRIPE · SANDBOX TEST MODE
                   </p>
                 </>
               )}
