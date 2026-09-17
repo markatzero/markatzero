@@ -15,20 +15,31 @@ const allowedImageTypes = new Set([
 const maxFileSize = 15 * 1024 * 1024;
 
 export async function GET() {
-  const { data, error } = await supabaseAdmin
-    .from("marks")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(10);
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("marks")
+      .select(
+        "id, created_at, country, message, image_url, mark_number"
+      )
+      .eq("status", "paid")
+      .not("mark_number", "is", null)
+      .order("mark_number", { ascending: false })
+      .limit(10);
 
-  if (error) {
+    if (error) {
+      throw error;
+    }
+
+    return NextResponse.json({ marks: data });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Could not load marks.";
+
     return NextResponse.json(
-      { error: error.message },
+      { error: message },
       { status: 500 }
     );
   }
-
-  return NextResponse.json({ marks: data });
 }
 
 export async function POST(request: Request) {
@@ -99,10 +110,7 @@ export async function POST(request: Request) {
       });
 
     if (uploadError) {
-      return NextResponse.json(
-        { error: uploadError.message },
-        { status: 500 }
-      );
+      throw uploadError;
     }
 
     const { data: publicUrlData } = supabaseAdmin.storage
@@ -124,21 +132,21 @@ export async function POST(request: Request) {
 
     if (error) {
       await supabaseAdmin.storage.from("marks").remove([uploadedPath]);
-
-      return NextResponse.json(
-        { error: error.message },
-        { status: 500 }
-      );
+      uploadedPath = null;
+      throw error;
     }
 
     return NextResponse.json({ mark: data }, { status: 201 });
-  } catch {
+  } catch (error) {
     if (uploadedPath) {
       await supabaseAdmin.storage.from("marks").remove([uploadedPath]);
     }
 
+    const message =
+      error instanceof Error ? error.message : "Invalid request.";
+
     return NextResponse.json(
-      { error: "Invalid request." },
+      { error: message },
       { status: 400 }
     );
   }
