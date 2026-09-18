@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import LeaveMarkModal from "../components/LeaveMarkModal";
-import WorldMap, { type PaidMark } from "../components/map/WorldMap";
+import WorldMap from "../components/map/WorldMap";
+import type { PaidMark } from "../types/mark";
 
 export default function Home() {
   const [paidMarks, setPaidMarks] = useState<PaidMark[]>([]);

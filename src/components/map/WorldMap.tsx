@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from "react-simple-maps";
-
+import type { PaidMark } from "../../types/mark";
 const geoUrl = "/countries.geojson";
 
 type Position = [number, number];
@@ -16,14 +16,6 @@ type CountryFeature = {
   };
 };
 
-export type PaidMark = {
-  id: number;
-  created_at: string;
-  country: string;
-  message: string | null;
-  image_url: string;
-  mark_number: number;
-};
 
 type WorldMapProps = {
   paidMarks: PaidMark[];
