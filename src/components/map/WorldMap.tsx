@@ -9,6 +9,7 @@ import {
   ZoomableGroup,
 } from "react-simple-maps";
 
+import MosaicLayer from "./MosaicLayer";
 import type { PaidMark } from "../../types/mark";
 
 const geoUrl = "/countries.geojson";
@@ -205,6 +206,11 @@ export default function WorldMap({
                     />
                   ))}
 
+                  <MosaicLayer
+                    zoom={mapZoom}
+                    marks={paidMarks}
+                  />
+
                   {paidMarks.map((mark) => {
                     let point: Position | null = null;
 
@@ -297,9 +303,7 @@ export default function WorldMap({
                             rx={2}
                             fill="#083344"
                             stroke="rgba(103,232,249,.85)"
-                            strokeWidth={
-                              0.8 / mapZoom
-                            }
+                            strokeWidth={0.8 / mapZoom}
                           />
 
                           <image
