@@ -1,6 +1,13 @@
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { readFile } from "fs/promises";
+import path from "path";
+
+import {
+  getPermanentMarkCoordinates,
+  type CountryGeoJson,
+} from "../../../lib/map";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -8,6 +15,18 @@ const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SECRET_KEY!
 );
+
+async function loadCountriesGeoJson(): Promise<CountryGeoJson> {
+  const filePath = path.join(
+    process.cwd(),
+    "public",
+    "countries.geojson"
+  );
+
+  const file = await readFile(filePath, "utf8");
+
+  return JSON.parse(file) as CountryGeoJson;
+}
 
 export async function POST(request: Request) {
   try {
@@ -47,7 +66,9 @@ export async function POST(request: Request) {
       ) {
         const { data: mark, error: markError } = await supabaseAdmin
           .from("marks")
-          .select("id, status, mark_number")
+          .select(
+            "id, status, mark_number, country, longitude, latitude"
+          )
           .eq("id", markId)
           .single();
 
@@ -72,6 +93,22 @@ export async function POST(request: Request) {
           const nextMarkNumber =
             (lastMark?.mark_number ?? 0) + 1;
 
+          const countriesGeoJson =
+            await loadCountriesGeoJson();
+
+          const coordinates =
+            getPermanentMarkCoordinates(
+              mark.country,
+              nextMarkNumber,
+              countriesGeoJson
+            );
+
+          if (!coordinates) {
+            throw new Error(
+              `Could not generate coordinates for country: ${mark.country}`
+            );
+          }
+
           const { error: updateError } = await supabaseAdmin
             .from("marks")
             .update({
@@ -80,6 +117,8 @@ export async function POST(request: Request) {
                 ? String(session.payment_intent)
                 : session.id,
               mark_number: nextMarkNumber,
+              longitude: coordinates.longitude,
+              latitude: coordinates.latitude,
             })
             .eq("id", markId)
             .eq("status", "pending");
@@ -94,7 +133,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ received: true });
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "Webhook failed.";
+      error instanceof Error
+        ? error.message
+        : "Webhook failed.";
 
     return NextResponse.json(
       { error: message },

@@ -19,7 +19,7 @@ export async function GET() {
     const { data, error } = await supabaseAdmin
       .from("marks")
       .select(
-        "id, created_at, country, message, image_url, mark_number"
+        "id, created_at, country, message, image_url, mark_number, longitude, latitude"
       )
       .eq("status", "paid")
       .not("mark_number", "is", null)
