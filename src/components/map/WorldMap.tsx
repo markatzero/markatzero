@@ -139,6 +139,9 @@ export default function WorldMap({
   const [mapCenter, setMapCenter] =
     useState<[number, number]>([8, 18]);
 
+  const [selectedMark, setSelectedMark] =
+    useState<PaidMark | null>(null);
+
   return (
     <div className="relative h-[650px] overflow-hidden rounded-2xl border border-white/[0.08] bg-[#020a14]">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(14,165,233,0.20),transparent_58%)]" />
@@ -268,7 +271,24 @@ export default function WorldMap({
                         key={mark.id}
                         coordinates={point}
                       >
-                        <g>
+                        <g
+                          role="button"
+                          tabIndex={0}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setSelectedMark(mark);
+                          }}
+                          onKeyDown={(event) => {
+                            if (
+                              event.key === "Enter" ||
+                              event.key === " "
+                            ) {
+                              event.preventDefault();
+                              setSelectedMark(mark);
+                            }
+                          }}
+                          className="cursor-pointer"
+                        >
                           <rect
                             x={-size / 2 - 1}
                             y={-size / 2 - 1}
@@ -289,6 +309,7 @@ export default function WorldMap({
                             width={size}
                             height={size}
                             preserveAspectRatio="xMidYMid slice"
+                            pointerEvents="none"
                           />
 
                           <title>
@@ -304,6 +325,43 @@ export default function WorldMap({
           </ZoomableGroup>
         </ComposableMap>
       </div>
+
+      {selectedMark && (
+        <div className="absolute bottom-20 right-5 z-30 w-[260px] rounded-2xl border border-cyan-200/20 bg-[#03111d]/95 p-4 shadow-[0_0_35px_rgba(34,211,238,0.16)] backdrop-blur-xl">
+          <button
+            type="button"
+            onClick={() => setSelectedMark(null)}
+            className="absolute right-3 top-2 text-lg text-slate-500 transition hover:text-white"
+            aria-label="Close mark details"
+          >
+            ×
+          </button>
+
+          <div className="flex items-center gap-3">
+            <img
+              src={selectedMark.image_url}
+              alt={`Mark #${selectedMark.mark_number}`}
+              className="h-14 w-14 rounded-lg border border-cyan-200/20 object-cover"
+            />
+
+            <div className="min-w-0">
+              <p className="text-[9px] tracking-[0.22em] text-cyan-300">
+                MARK #{selectedMark.mark_number}
+              </p>
+
+              <p className="mt-1 truncate text-sm font-medium text-white">
+                {selectedMark.country}
+              </p>
+            </div>
+          </div>
+
+          {selectedMark.message && (
+            <p className="mt-4 border-t border-white/[0.08] pt-3 text-xs leading-5 text-slate-300">
+              {selectedMark.message}
+            </p>
+          )}
+        </div>
+      )}
 
       <div className="absolute left-5 top-1/2 z-20 flex -translate-y-1/2 flex-col gap-2">
         <button
