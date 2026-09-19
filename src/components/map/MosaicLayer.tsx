@@ -1,5 +1,8 @@
 "use client";
 
+import { Marker } from "react-simple-maps";
+
+import { buildMosaicCells } from "../../lib/mosaic";
 import type { PaidMark } from "../../types/mark";
 
 export type MapDetailLevel =
@@ -32,39 +35,81 @@ export default function MosaicLayer({
 }: MosaicLayerProps) {
   const detailLevel = getMapDetailLevel(zoom);
 
-  /*
-   * Phase C foundation:
-   *
-   * world:
-   *   Lightweight global representation.
-   *
-   * mosaic:
-   *   Precomputed / aggregated mosaic tiles.
-   *
-   * marks:
-   *   Individual interactive Marks.
-   *
-   * We intentionally do not render millions of
-   * SVG or DOM elements here.
-   */
-
   if (detailLevel === "marks") {
     return null;
   }
 
-  if (detailLevel === "mosaic") {
-    return (
-      <g
-        data-map-layer="mosaic"
-        data-mark-count={marks.length}
-      />
-    );
-  }
+  const cells = buildMosaicCells(
+    marks,
+    zoom
+  );
 
   return (
     <g
-      data-map-layer="world"
-      data-mark-count={marks.length}
-    />
+      data-map-layer={detailLevel}
+      data-cell-count={cells.length}
+    >
+      {cells.map((cell) => {
+        const size =
+          detailLevel === "world"
+            ? 4
+            : Math.max(
+                5,
+                Math.min(
+                  12,
+                  5 + zoom * 0.7
+                )
+              );
+
+        return (
+          <Marker
+            key={cell.id}
+            coordinates={[
+              cell.longitude,
+              cell.latitude,
+            ]}
+          >
+            <g pointerEvents="none">
+              <rect
+                x={-size / 2 - 0.5}
+                y={-size / 2 - 0.5}
+                width={size + 1}
+                height={size + 1}
+                rx={1}
+                fill="#083344"
+                stroke="rgba(103,232,249,.55)"
+                strokeWidth={0.5 / zoom}
+              />
+
+              <image
+                href={
+                  cell.representativeMark
+                    .image_url
+                }
+                x={-size / 2}
+                y={-size / 2}
+                width={size}
+                height={size}
+                preserveAspectRatio="xMidYMid slice"
+                opacity={
+                  detailLevel === "world"
+                    ? 0.72
+                    : 0.9
+                }
+              />
+
+              {cell.count > 1 && (
+                <circle
+                  cx={size / 2}
+                  cy={-size / 2}
+                  r={2.2}
+                  fill="#67e8f9"
+                />
+              )}
+            </g>
+          </Marker>
+        );
+      })}
+    </g>
   );
 }

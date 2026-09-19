@@ -9,7 +9,9 @@ import {
 } from "react-simple-maps";
 
 import MarksLayer from "./MarksLayer";
-import MosaicLayer from "./MosaicLayer";
+import MosaicLayer, {
+  getMapDetailLevel,
+} from "./MosaicLayer";
 import type { PaidMark } from "../../types/mark";
 
 const geoUrl = "/countries.geojson";
@@ -31,6 +33,9 @@ export default function WorldMap({
 
   const [selectedMark, setSelectedMark] =
     useState<PaidMark | null>(null);
+
+  const detailLevel =
+    getMapDetailLevel(mapZoom);
 
   return (
     <div className="relative h-[650px] overflow-hidden rounded-2xl border border-white/[0.08] bg-[#020a14]">
@@ -95,17 +100,21 @@ export default function WorldMap({
                     />
                   ))}
 
-                  <MosaicLayer
-                    zoom={mapZoom}
-                    marks={paidMarks}
-                  />
+                  {detailLevel !== "marks" && (
+                    <MosaicLayer
+                      zoom={mapZoom}
+                      marks={paidMarks}
+                    />
+                  )}
 
-                  <MarksLayer
-                    marks={paidMarks}
-                    geographies={geographies}
-                    zoom={mapZoom}
-                    onSelectMark={setSelectedMark}
-                  />
+                  {detailLevel === "marks" && (
+                    <MarksLayer
+                      marks={paidMarks}
+                      geographies={geographies}
+                      zoom={mapZoom}
+                      onSelectMark={setSelectedMark}
+                    />
+                  )}
                 </>
               )}
             </Geographies>
