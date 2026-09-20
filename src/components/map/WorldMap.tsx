@@ -1,6 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import {
+  useMemo,
+  useState,
+} from "react";
+
 import {
   ComposableMap,
   Geographies,
@@ -12,6 +16,9 @@ import MarksLayer from "./MarksLayer";
 import MosaicLayer, {
   getMapDetailLevel,
 } from "./MosaicLayer";
+
+import useVisibleMapMarks from "../../hooks/useVisibleMapMarks";
+import { getMapBounds } from "../../lib/mapViewport";
 import type { PaidMark } from "../../types/mark";
 
 const geoUrl = "/countries.geojson";
@@ -28,6 +35,7 @@ export default function WorldMap({
   onLeaveMark,
 }: WorldMapProps) {
   const [mapZoom, setMapZoom] = useState(1);
+
   const [mapCenter, setMapCenter] =
     useState<[number, number]>([8, 18]);
 
@@ -36,6 +44,30 @@ export default function WorldMap({
 
   const detailLevel =
     getMapDetailLevel(mapZoom);
+
+  const visibleBounds = useMemo(() => {
+    if (detailLevel !== "marks") {
+      return null;
+    }
+
+    return getMapBounds({
+      center: mapCenter,
+      zoom: mapZoom,
+    });
+  }, [
+    detailLevel,
+    mapCenter,
+    mapZoom,
+  ]);
+
+  const {
+    marks: visibleMarks,
+    loading: visibleMarksLoading,
+    error: visibleMarksError,
+  } = useVisibleMapMarks(
+    visibleBounds,
+    detailLevel === "marks"
+  );
 
   return (
     <div className="relative h-[650px] overflow-hidden rounded-2xl border border-white/[0.08] bg-[#020a14]">
@@ -76,12 +108,17 @@ export default function WorldMap({
             center={mapCenter}
             minZoom={1}
             maxZoom={64}
-            onMoveEnd={({ coordinates, zoom }) => {
+            onMoveEnd={({
+              coordinates,
+              zoom,
+            }) => {
               setMapCenter(
                 coordinates as [number, number]
               );
 
-              if (typeof zoom === "number") {
+              if (
+                typeof zoom === "number"
+              ) {
                 setMapZoom(zoom);
               }
             }}
@@ -95,24 +132,32 @@ export default function WorldMap({
                       geography={geo}
                       fill="#071827"
                       stroke="#155e75"
-                      strokeWidth={0.55 / mapZoom}
+                      strokeWidth={
+                        0.55 / mapZoom
+                      }
                       className="outline-none transition-colors hover:fill-[#0b2435]"
                     />
                   ))}
 
-                  {detailLevel !== "marks" && (
+                  {detailLevel !==
+                    "marks" && (
                     <MosaicLayer
                       zoom={mapZoom}
                       marks={paidMarks}
                     />
                   )}
 
-                  {detailLevel === "marks" && (
+                  {detailLevel ===
+                    "marks" && (
                     <MarksLayer
-                      marks={paidMarks}
-                      geographies={geographies}
+                      marks={visibleMarks}
+                      geographies={
+                        geographies
+                      }
                       zoom={mapZoom}
-                      onSelectMark={setSelectedMark}
+                      onSelectMark={
+                        setSelectedMark
+                      }
                     />
                   )}
                 </>
@@ -122,11 +167,28 @@ export default function WorldMap({
         </ComposableMap>
       </div>
 
+      {detailLevel === "marks" &&
+        visibleMarksLoading && (
+          <div className="pointer-events-none absolute right-5 top-16 z-20 rounded-lg border border-white/[0.08] bg-black/50 px-3 py-2 text-[8px] tracking-wider text-cyan-200 backdrop-blur">
+            LOADING VISIBLE MARKS
+          </div>
+        )}
+
+      {detailLevel === "marks" &&
+        visibleMarksError && (
+          <div className="absolute right-5 top-16 z-20 max-w-[240px] rounded-lg border border-red-300/20 bg-black/60 px-3 py-2 text-[8px] leading-4 text-red-200 backdrop-blur">
+            VISIBLE MARKS COULD NOT BE
+            LOADED
+          </div>
+        )}
+
       {selectedMark && (
         <div className="absolute bottom-20 right-5 z-30 w-[260px] rounded-2xl border border-cyan-200/20 bg-[#03111d]/95 p-4 shadow-[0_0_35px_rgba(34,211,238,0.16)] backdrop-blur-xl">
           <button
             type="button"
-            onClick={() => setSelectedMark(null)}
+            onClick={() =>
+              setSelectedMark(null)
+            }
             className="absolute right-3 top-2 text-lg text-slate-500 transition hover:text-white"
             aria-label="Close mark details"
           >
@@ -135,14 +197,19 @@ export default function WorldMap({
 
           <div className="flex items-center gap-3">
             <img
-              src={selectedMark.image_url}
+              src={
+                selectedMark.image_url
+              }
               alt={`Mark #${selectedMark.mark_number}`}
               className="h-14 w-14 rounded-lg border border-cyan-200/20 object-cover"
             />
 
             <div className="min-w-0">
               <p className="text-[9px] tracking-[0.22em] text-cyan-300">
-                MARK #{selectedMark.mark_number}
+                MARK #
+                {
+                  selectedMark.mark_number
+                }
               </p>
 
               <p className="mt-1 truncate text-sm font-medium text-white">
@@ -164,7 +231,10 @@ export default function WorldMap({
           type="button"
           onClick={() =>
             setMapZoom((zoom) =>
-              Math.min(64, zoom * 1.5)
+              Math.min(
+                64,
+                zoom * 1.5
+              )
             )
           }
           className="h-9 w-9 rounded-lg border border-cyan-200/15 bg-black/50 text-lg text-cyan-100 backdrop-blur"
@@ -176,7 +246,10 @@ export default function WorldMap({
           type="button"
           onClick={() =>
             setMapZoom((zoom) =>
-              Math.max(1, zoom / 1.5)
+              Math.max(
+                1,
+                zoom / 1.5
+              )
             )
           }
           className="h-9 w-9 rounded-lg border border-cyan-200/15 bg-black/50 text-lg text-cyan-100 backdrop-blur"
@@ -191,7 +264,8 @@ export default function WorldMap({
         </p>
 
         <p className="mt-1 text-[10px] text-cyan-300">
-          {totalMarks.toLocaleString()} marks connected
+          {totalMarks.toLocaleString()}{" "}
+          marks connected
         </p>
       </div>
 
