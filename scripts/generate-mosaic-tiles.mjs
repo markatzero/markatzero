@@ -4,6 +4,7 @@ import sharp from "sharp";
 
 const TILE_SIZE = 512;
 const LEVELS = [0, 1, 2, 3];
+const STORAGE_BUCKET = "mosaic-tiles";
 
 const OUTPUT_DIR = path.join(
   process.cwd(),
@@ -137,6 +138,116 @@ function getMarkSize(markCount, level) {
       Math.floor(calculatedSize)
     )
   );
+}
+
+async function loadEnvironment() {
+  const envPath = path.join(
+    process.cwd(),
+    ".env.local"
+  );
+
+  const content = await fs.readFile(
+    envPath,
+    "utf8"
+  );
+
+  for (const line of content.split(/\r?\n/)) {
+    const trimmed = line.trim();
+
+    if (
+      !trimmed ||
+      trimmed.startsWith("#")
+    ) {
+      continue;
+    }
+
+    const separator =
+      trimmed.indexOf("=");
+
+    if (separator === -1) {
+      continue;
+    }
+
+    const key = trimmed
+      .slice(0, separator)
+      .trim();
+
+    let value = trimmed
+      .slice(separator + 1)
+      .trim();
+
+    if (
+      (value.startsWith('"') &&
+        value.endsWith('"')) ||
+      (value.startsWith("'") &&
+        value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+
+    if (!process.env[key]) {
+      process.env[key] = value;
+    }
+  }
+}
+
+function getSupabaseConfig() {
+  const supabaseUrl =
+    process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+  const secretKey =
+    process.env.SUPABASE_SECRET_KEY;
+
+  if (!supabaseUrl || !secretKey) {
+    throw new Error(
+      "Supabase environment variables are missing"
+    );
+  }
+
+  return {
+    supabaseUrl,
+    secretKey,
+  };
+}
+
+async function supabaseRequest(
+  url,
+  options = {}
+) {
+  const { secretKey } =
+    getSupabaseConfig();
+
+  return fetch(url, {
+    ...options,
+    headers: {
+      apikey: secretKey,
+      Authorization:
+        `Bearer ${secretKey}`,
+      ...(options.headers ?? {}),
+    },
+  });
+}
+
+async function loadPaidMarks() {
+  const { supabaseUrl } =
+    getSupabaseConfig();
+
+  const response = await supabaseRequest(
+    `${supabaseUrl}/rest/v1/marks` +
+      "?select=id,image_url,longitude,latitude" +
+      "&status=eq.paid" +
+      "&mark_number=not.is.null" +
+      "&longitude=not.is.null" +
+      "&latitude=not.is.null"
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `Marks request failed: ${response.status}`
+    );
+  }
+
+  return response.json();
 }
 
 async function downloadMarkImage(imageUrl) {
@@ -321,93 +432,105 @@ async function buildTile(
   return outputPath;
 }
 
-async function loadEnvironment() {
-  const envPath = path.join(
-    process.cwd(),
-    ".env.local"
-  );
+async function uploadTile(tile, outputPath) {
+  const {
+    supabaseUrl,
+  } = getSupabaseConfig();
 
-  const content = await fs.readFile(
-    envPath,
-    "utf8"
-  );
+  const storagePath =
+    `level-${tile.level}/` +
+    `${tile.tileX}-${tile.tileY}.webp`;
 
-  for (const line of content.split(/\r?\n/)) {
-    const trimmed = line.trim();
+  const file =
+    await fs.readFile(outputPath);
 
-    if (
-      !trimmed ||
-      trimmed.startsWith("#")
-    ) {
-      continue;
-    }
-
-    const separator =
-      trimmed.indexOf("=");
-
-    if (separator === -1) {
-      continue;
-    }
-
-    const key = trimmed
-      .slice(0, separator)
-      .trim();
-
-    let value = trimmed
-      .slice(separator + 1)
-      .trim();
-
-    if (
-      (value.startsWith('"') &&
-        value.endsWith('"')) ||
-      (value.startsWith("'") &&
-        value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1);
-    }
-
-    if (!process.env[key]) {
-      process.env[key] = value;
-    }
-  }
-}
-
-async function loadPaidMarks() {
-  const supabaseUrl =
-    process.env.NEXT_PUBLIC_SUPABASE_URL;
-
-  const secretKey =
-    process.env.SUPABASE_SECRET_KEY;
-
-  if (!supabaseUrl || !secretKey) {
-    throw new Error(
-      "Supabase environment variables are missing"
-    );
-  }
-
-  const response = await fetch(
-    `${supabaseUrl}/rest/v1/marks` +
-      "?select=id,image_url,longitude,latitude" +
-      "&status=eq.paid" +
-      "&mark_number=not.is.null" +
-      "&longitude=not.is.null" +
-      "&latitude=not.is.null",
+  const response = await supabaseRequest(
+    `${supabaseUrl}` +
+      `/storage/v1/object/` +
+      `${STORAGE_BUCKET}/` +
+      `${storagePath}`,
     {
+      method: "POST",
       headers: {
-        apikey: secretKey,
-        Authorization:
-          `Bearer ${secretKey}`,
+        "Content-Type": "image/webp",
+        "x-upsert": "true",
       },
+      body: file,
     }
   );
 
   if (!response.ok) {
+    const message =
+      await response.text();
+
     throw new Error(
-      `Marks request failed: ${response.status}`
+      `Tile upload failed: ` +
+        `${response.status} ${message}`
     );
   }
 
-  return response.json();
+  return {
+    storagePath,
+    imageUrl:
+      `${supabaseUrl}` +
+      `/storage/v1/object/public/` +
+      `${STORAGE_BUCKET}/` +
+      `${storagePath}`,
+  };
+}
+
+async function saveTileMetadata(
+  tile,
+  imageUrl
+) {
+  const {
+    supabaseUrl,
+  } = getSupabaseConfig();
+
+  const bounds = tileBounds(
+    tile.level,
+    tile.tileX,
+    tile.tileY
+  );
+
+  const response = await supabaseRequest(
+    `${supabaseUrl}` +
+      `/rest/v1/mosaic_tiles` +
+      `?on_conflict=level,tile_x,tile_y`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type":
+          "application/json",
+        Prefer:
+          "resolution=merge-duplicates",
+      },
+      body: JSON.stringify({
+        level: tile.level,
+        tile_x: tile.tileX,
+        tile_y: tile.tileY,
+        west: bounds.west,
+        east: bounds.east,
+        south: bounds.south,
+        north: bounds.north,
+        image_url: imageUrl,
+        mark_count: tile.marks.length,
+        status: "ready",
+        updated_at:
+          new Date().toISOString(),
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const message =
+      await response.text();
+
+    throw new Error(
+      `Metadata save failed: ` +
+        `${response.status} ${message}`
+    );
+  }
 }
 
 async function clearPreviousOutput() {
@@ -469,27 +592,32 @@ async function main() {
         continue;
       }
 
-      totalTiles += 1;
+      const uploaded =
+        await uploadTile(
+          tile,
+          outputPath
+        );
 
-      const bounds = tileBounds(
-        level,
-        tile.tileX,
-        tile.tileY
+      await saveTileMetadata(
+        tile,
+        uploaded.imageUrl
       );
+
+      totalTiles += 1;
 
       console.log(
         [
-          `Created ${outputPath}`,
+          `Published level ${tile.level}`,
+          `tile ${tile.tileX}:${tile.tileY}`,
           `Marks: ${tile.marks.length}`,
-          `Bounds:`,
-          JSON.stringify(bounds),
         ].join(" ")
       );
     }
   }
 
   console.log(
-    `Generation complete: ${totalTiles} tile(s)`
+    `Generation complete: ` +
+      `${totalTiles} tile(s) published`
   );
 }
 
