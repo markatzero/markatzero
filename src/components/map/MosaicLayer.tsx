@@ -2,8 +2,7 @@
 
 import { Marker } from "react-simple-maps";
 
-import { buildMosaicCells } from "../../lib/mosaic";
-import type { PaidMark } from "../../types/mark";
+import type { MapMosaicCell } from "../../hooks/useMapMosaic";
 
 export type MapDetailLevel =
   | "world"
@@ -12,7 +11,7 @@ export type MapDetailLevel =
 
 type MosaicLayerProps = {
   zoom: number;
-  marks: PaidMark[];
+  cells: MapMosaicCell[];
 };
 
 export function getMapDetailLevel(
@@ -31,18 +30,14 @@ export function getMapDetailLevel(
 
 export default function MosaicLayer({
   zoom,
-  marks,
+  cells,
 }: MosaicLayerProps) {
-  const detailLevel = getMapDetailLevel(zoom);
+  const detailLevel =
+    getMapDetailLevel(zoom);
 
   if (detailLevel === "marks") {
     return null;
   }
-
-  const cells = buildMosaicCells(
-    marks,
-    zoom
-  );
 
   return (
     <g
@@ -63,7 +58,7 @@ export default function MosaicLayer({
 
         return (
           <Marker
-            key={cell.id}
+            key={`${cell.cell_x}:${cell.cell_y}`}
             coordinates={[
               cell.longitude,
               cell.latitude,
@@ -83,8 +78,7 @@ export default function MosaicLayer({
 
               <image
                 href={
-                  cell.representativeMark
-                    .image_url
+                  cell.representative_image_url
                 }
                 x={-size / 2}
                 y={-size / 2}
@@ -98,7 +92,7 @@ export default function MosaicLayer({
                 }
               />
 
-              {cell.count > 1 && (
+              {cell.mark_count > 1 && (
                 <circle
                   cx={size / 2}
                   cy={-size / 2}

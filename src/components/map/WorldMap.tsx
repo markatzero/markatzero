@@ -17,6 +17,9 @@ import MosaicLayer, {
   getMapDetailLevel,
 } from "./MosaicLayer";
 
+import useMapMosaic, {
+  type MosaicLevel,
+} from "../../hooks/useMapMosaic";
 import useVisibleMapMarks from "../../hooks/useVisibleMapMarks";
 import { getMapBounds } from "../../lib/mapViewport";
 import type { PaidMark } from "../../types/mark";
@@ -29,8 +32,22 @@ type WorldMapProps = {
   onLeaveMark: () => void;
 };
 
+function getMosaicLevel(
+  zoom: number
+): MosaicLevel {
+  if (zoom < 3) {
+    return "world";
+  }
+
+  if (zoom < 7) {
+    return "medium";
+  }
+
+  return "detail";
+}
+
 export default function WorldMap({
-  paidMarks,
+  paidMarks: _paidMarks,
   totalMarks,
   onLeaveMark,
 }: WorldMapProps) {
@@ -44,6 +61,18 @@ export default function WorldMap({
 
   const detailLevel =
     getMapDetailLevel(mapZoom);
+
+  const mosaicLevel =
+    getMosaicLevel(mapZoom);
+
+  const {
+    cells: mosaicCells,
+    loading: mosaicLoading,
+    error: mosaicError,
+  } = useMapMosaic(
+    mosaicLevel,
+    detailLevel !== "marks"
+  );
 
   const visibleBounds = useMemo(() => {
     if (detailLevel !== "marks") {
@@ -143,7 +172,7 @@ export default function WorldMap({
                     "marks" && (
                     <MosaicLayer
                       zoom={mapZoom}
-                      marks={paidMarks}
+                      cells={mosaicCells}
                     />
                   )}
 
@@ -166,6 +195,20 @@ export default function WorldMap({
           </ZoomableGroup>
         </ComposableMap>
       </div>
+
+      {detailLevel !== "marks" &&
+        mosaicLoading && (
+          <div className="pointer-events-none absolute right-5 top-16 z-20 rounded-lg border border-white/[0.08] bg-black/50 px-3 py-2 text-[8px] tracking-wider text-cyan-200 backdrop-blur">
+            LOADING MOSAIC
+          </div>
+        )}
+
+      {detailLevel !== "marks" &&
+        mosaicError && (
+          <div className="absolute right-5 top-16 z-20 max-w-[240px] rounded-lg border border-red-300/20 bg-black/60 px-3 py-2 text-[8px] leading-4 text-red-200 backdrop-blur">
+            MOSAIC COULD NOT BE LOADED
+          </div>
+        )}
 
       {detailLevel === "marks" &&
         visibleMarksLoading && (
@@ -197,9 +240,7 @@ export default function WorldMap({
 
           <div className="flex items-center gap-3">
             <img
-              src={
-                selectedMark.image_url
-              }
+              src={selectedMark.image_url}
               alt={`Mark #${selectedMark.mark_number}`}
               className="h-14 w-14 rounded-lg border border-cyan-200/20 object-cover"
             />
@@ -207,9 +248,7 @@ export default function WorldMap({
             <div className="min-w-0">
               <p className="text-[9px] tracking-[0.22em] text-cyan-300">
                 MARK #
-                {
-                  selectedMark.mark_number
-                }
+                {selectedMark.mark_number}
               </p>
 
               <p className="mt-1 truncate text-sm font-medium text-white">
