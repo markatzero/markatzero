@@ -13,13 +13,9 @@ import {
 } from "react-simple-maps";
 
 import MarksLayer from "./MarksLayer";
-import MosaicLayer, {
-  getMapDetailLevel,
-} from "./MosaicLayer";
+import MosaicTileLayer from "./MosaicTileLayer";
 
-import useMapMosaic, {
-  type MosaicLevel,
-} from "../../hooks/useMapMosaic";
+import { useMosaicTiles } from "../../hooks/useMosaicTiles";
 import useVisibleMapMarks from "../../hooks/useVisibleMapMarks";
 import { getMapBounds } from "../../lib/mapViewport";
 import type { PaidMark } from "../../types/mark";
@@ -32,18 +28,32 @@ type WorldMapProps = {
   onLeaveMark: () => void;
 };
 
-function getMosaicLevel(
+type MapDetailLevel =
+  | "tiles"
+  | "marks";
+
+function getMapDetailLevel(
   zoom: number
-): MosaicLevel {
+): MapDetailLevel {
+  if (zoom < 12) {
+    return "tiles";
+  }
+
+  return "marks";
+}
+
+function getTileLevel(
+  zoom: number
+) {
   if (zoom < 3) {
-    return "world";
+    return 0;
   }
 
   if (zoom < 7) {
-    return "medium";
+    return 1;
   }
 
-  return "detail";
+  return 2;
 }
 
 export default function WorldMap({
@@ -51,7 +61,8 @@ export default function WorldMap({
   totalMarks,
   onLeaveMark,
 }: WorldMapProps) {
-  const [mapZoom, setMapZoom] = useState(1);
+  const [mapZoom, setMapZoom] =
+    useState(1);
 
   const [mapCenter, setMapCenter] =
     useState<[number, number]>([8, 18]);
@@ -62,16 +73,16 @@ export default function WorldMap({
   const detailLevel =
     getMapDetailLevel(mapZoom);
 
-  const mosaicLevel =
-    getMosaicLevel(mapZoom);
+  const tileLevel =
+    getTileLevel(mapZoom);
 
   const {
-    cells: mosaicCells,
-    loading: mosaicLoading,
-    error: mosaicError,
-  } = useMapMosaic(
-    mosaicLevel,
-    detailLevel !== "marks"
+    tiles: mosaicTiles,
+    loading: mosaicTilesLoading,
+    error: mosaicTilesError,
+  } = useMosaicTiles(
+    tileLevel,
+    detailLevel === "tiles"
   );
 
   const visibleBounds = useMemo(() => {
@@ -142,7 +153,10 @@ export default function WorldMap({
               zoom,
             }) => {
               setMapCenter(
-                coordinates as [number, number]
+                coordinates as [
+                  number,
+                  number
+                ]
               );
 
               if (
@@ -168,11 +182,10 @@ export default function WorldMap({
                     />
                   ))}
 
-                  {detailLevel !==
-                    "marks" && (
-                    <MosaicLayer
-                      zoom={mapZoom}
-                      cells={mosaicCells}
+                  {detailLevel ===
+                    "tiles" && (
+                    <MosaicTileLayer
+                      tiles={mosaicTiles}
                     />
                   )}
 
@@ -196,15 +209,15 @@ export default function WorldMap({
         </ComposableMap>
       </div>
 
-      {detailLevel !== "marks" &&
-        mosaicLoading && (
+      {detailLevel === "tiles" &&
+        mosaicTilesLoading && (
           <div className="pointer-events-none absolute right-5 top-16 z-20 rounded-lg border border-white/[0.08] bg-black/50 px-3 py-2 text-[8px] tracking-wider text-cyan-200 backdrop-blur">
             LOADING MOSAIC
           </div>
         )}
 
-      {detailLevel !== "marks" &&
-        mosaicError && (
+      {detailLevel === "tiles" &&
+        mosaicTilesError && (
           <div className="absolute right-5 top-16 z-20 max-w-[240px] rounded-lg border border-red-300/20 bg-black/60 px-3 py-2 text-[8px] leading-4 text-red-200 backdrop-blur">
             MOSAIC COULD NOT BE LOADED
           </div>
