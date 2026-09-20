@@ -3,7 +3,7 @@ import path from "node:path";
 import sharp from "sharp";
 
 const TILE_SIZE = 512;
-const LEVEL = 0;
+const LEVELS = [0, 1, 2, 3];
 
 const OUTPUT_DIR = path.join(
   process.cwd(),
@@ -119,6 +119,26 @@ function markPositionInsideTile(
   };
 }
 
+function getMarkSize(markCount, level) {
+  const levelBoost = 1 + level * 0.18;
+
+  const calculatedSize =
+    (TILE_SIZE /
+      Math.max(
+        4,
+        Math.sqrt(markCount) * 1.5
+      )) *
+    levelBoost;
+
+  return Math.max(
+    12,
+    Math.min(
+      96,
+      Math.floor(calculatedSize)
+    )
+  );
+}
+
 async function downloadMarkImage(imageUrl) {
   const response = await fetch(imageUrl);
 
@@ -133,35 +153,86 @@ async function downloadMarkImage(imageUrl) {
   );
 }
 
-async function buildTile(tile) {
+async function loadMarkImages(marks) {
+  const images = new Map();
+
+  for (const mark of marks) {
+    try {
+      const source =
+        await downloadMarkImage(
+          mark.image_url
+        );
+
+      images.set(mark.id, source);
+    } catch (error) {
+      console.error(
+        `Skipping Mark ${mark.id}:`,
+        error.message
+      );
+    }
+  }
+
+  return images;
+}
+
+function groupMarksByTile(marks, level) {
+  const tiles = new Map();
+
+  for (const mark of marks) {
+    const tileX = longitudeToTileX(
+      mark.longitude,
+      level
+    );
+
+    const tileY = latitudeToTileY(
+      mark.latitude,
+      level
+    );
+
+    const key = `${tileX}:${tileY}`;
+
+    if (!tiles.has(key)) {
+      tiles.set(key, {
+        level,
+        tileX,
+        tileY,
+        marks: [],
+      });
+    }
+
+    tiles.get(key).marks.push(mark);
+  }
+
+  return tiles;
+}
+
+async function buildTile(
+  tile,
+  markImages
+) {
   const markCount = tile.marks.length;
 
   if (markCount === 0) {
     return null;
   }
 
-  const markSize = Math.max(
-    12,
-    Math.min(
-      72,
-      Math.floor(
-        TILE_SIZE /
-          Math.max(
-            4,
-            Math.sqrt(markCount) * 1.5
-          )
-      )
-    )
+  const markSize = getMarkSize(
+    markCount,
+    tile.level
   );
 
   const composites = [];
 
   for (const mark of tile.marks) {
-    try {
-      const source = await downloadMarkImage(
-        mark.image_url
-      );
+    const source = markImages.get(
+      mark.id
+    );
 
+    if (!source) {
+      continue;
+    }
+
+    try {
       const image = await sharp(source)
         .resize(markSize, markSize, {
           fit: "cover",
@@ -175,7 +246,7 @@ async function buildTile(tile) {
         markPositionInsideTile(
           mark.longitude,
           mark.latitude,
-          LEVEL,
+          tile.level,
           tile.tileX,
           tile.tileY
         );
@@ -187,7 +258,8 @@ async function buildTile(tile) {
           Math.min(
             TILE_SIZE - markSize,
             Math.round(
-              position.x - markSize / 2
+              position.x -
+                markSize / 2
             )
           )
         ),
@@ -196,14 +268,15 @@ async function buildTile(tile) {
           Math.min(
             TILE_SIZE - markSize,
             Math.round(
-              position.y - markSize / 2
+              position.y -
+                markSize / 2
             )
           )
         ),
       });
     } catch (error) {
       console.error(
-        `Skipping Mark ${mark.id}:`,
+        `Could not prepare Mark ${mark.id}:`,
         error.message
       );
     }
@@ -215,7 +288,7 @@ async function buildTile(tile) {
 
   const outputPath = path.join(
     OUTPUT_DIR,
-    `level-${LEVEL}`,
+    `level-${tile.level}`,
     `${tile.tileX}-${tile.tileY}.webp`
   );
 
@@ -322,7 +395,8 @@ async function loadPaidMarks() {
     {
       headers: {
         apikey: secretKey,
-        Authorization: `Bearer ${secretKey}`,
+        Authorization:
+          `Bearer ${secretKey}`,
       },
     }
   );
@@ -336,6 +410,13 @@ async function loadPaidMarks() {
   return response.json();
 }
 
+async function clearPreviousOutput() {
+  await fs.rm(OUTPUT_DIR, {
+    recursive: true,
+    force: true,
+  });
+}
+
 async function main() {
   await loadEnvironment();
 
@@ -345,61 +426,71 @@ async function main() {
     `Loaded ${marks.length} paid Marks`
   );
 
-  const tiles = new Map();
-
-  for (const mark of marks) {
-    const tileX = longitudeToTileX(
-      mark.longitude,
-      LEVEL
+  if (marks.length === 0) {
+    console.log(
+      "No paid Marks available"
     );
-
-    const tileY = latitudeToTileY(
-      mark.latitude,
-      LEVEL
-    );
-
-    const key = `${tileX}:${tileY}`;
-
-    if (!tiles.has(key)) {
-      tiles.set(key, {
-        tileX,
-        tileY,
-        marks: [],
-      });
-    }
-
-    tiles.get(key).marks.push(mark);
+    return;
   }
 
   console.log(
-    `Building ${tiles.size} mosaic tile(s)`
+    "Downloading Mark images"
   );
 
-  for (const tile of tiles.values()) {
-    const bounds = tileBounds(
-      LEVEL,
-      tile.tileX,
-      tile.tileY
+  const markImages =
+    await loadMarkImages(marks);
+
+  console.log(
+    `Downloaded ${markImages.size} Mark image(s)`
+  );
+
+  await clearPreviousOutput();
+
+  let totalTiles = 0;
+
+  for (const level of LEVELS) {
+    const tiles = groupMarksByTile(
+      marks,
+      level
     );
-
-    const outputPath =
-      await buildTile(tile);
-
-    if (!outputPath) {
-      continue;
-    }
 
     console.log(
-      [
-        `Created ${outputPath}`,
-        `Marks: ${tile.marks.length}`,
-        `Bounds:`,
-        JSON.stringify(bounds),
-      ].join(" ")
+      `Level ${level}: building ${tiles.size} tile(s)`
     );
+
+    for (const tile of tiles.values()) {
+      const outputPath =
+        await buildTile(
+          tile,
+          markImages
+        );
+
+      if (!outputPath) {
+        continue;
+      }
+
+      totalTiles += 1;
+
+      const bounds = tileBounds(
+        level,
+        tile.tileX,
+        tile.tileY
+      );
+
+      console.log(
+        [
+          `Created ${outputPath}`,
+          `Marks: ${tile.marks.length}`,
+          `Bounds:`,
+          JSON.stringify(bounds),
+        ].join(" ")
+      );
+    }
   }
 
-  console.log("Generation complete");
+  console.log(
+    `Generation complete: ${totalTiles} tile(s)`
+  );
 }
 
 main().catch((error) => {
