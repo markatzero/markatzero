@@ -12,6 +12,12 @@ const OUTPUT_DIR = path.join(
   "mosaic-tiles"
 );
 
+const GEOJSON_PATH = path.join(
+  process.cwd(),
+  "public",
+  "countries.geojson"
+);
+
 function longitudeToTileX(longitude, level) {
   const tilesPerAxis = 2 ** level;
 
@@ -97,47 +103,62 @@ function tileBounds(level, tileX, tileY) {
   };
 }
 
-function markPositionInsideTile(
+function longitudeToWorldPixel(
+  longitude,
+  level
+) {
+  const worldSize =
+    TILE_SIZE * 2 ** level;
+
+  return (
+    ((longitude + 180) / 360) *
+    worldSize
+  );
+}
+
+function latitudeToWorldPixel(
+  latitude,
+  level
+) {
+  const worldSize =
+    TILE_SIZE * 2 ** level;
+
+  return (
+    latitudeToMercatorY(latitude) *
+    worldSize
+  );
+}
+
+function coordinateToTilePixel(
   longitude,
   latitude,
   level,
   tileX,
   tileY
 ) {
-  const tilesPerAxis = 2 ** level;
+  const worldX = longitudeToWorldPixel(
+    longitude,
+    level
+  );
 
-  const worldX =
-    ((longitude + 180) / 360) *
-    tilesPerAxis;
-
-  const worldY =
-    latitudeToMercatorY(latitude) *
-    tilesPerAxis;
+  const worldY = latitudeToWorldPixel(
+    latitude,
+    level
+  );
 
   return {
-    x: (worldX - tileX) * TILE_SIZE,
-    y: (worldY - tileY) * TILE_SIZE,
+    x: worldX - tileX * TILE_SIZE,
+    y: worldY - tileY * TILE_SIZE,
   };
 }
 
-function getMarkSize(markCount, level) {
-  const levelBoost = 1 + level * 0.18;
-
-  const calculatedSize =
-    (TILE_SIZE /
-      Math.max(
-        4,
-        Math.sqrt(markCount) * 1.5
-      )) *
-    levelBoost;
-
-  return Math.max(
-    12,
-    Math.min(
-      96,
-      Math.floor(calculatedSize)
-    )
-  );
+function escapeXml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&apos;");
 }
 
 async function loadEnvironment() {
@@ -286,8 +307,254 @@ async function loadMarkImages(marks) {
   return images;
 }
 
+async function loadLandGeoJson() {
+  const content = await fs.readFile(
+    GEOJSON_PATH,
+    "utf8"
+  );
+
+  const geoJson = JSON.parse(content);
+
+  if (
+    !geoJson ||
+    !Array.isArray(geoJson.features)
+  ) {
+    throw new Error(
+      "countries.geojson is not a valid FeatureCollection"
+    );
+  }
+
+  return geoJson;
+}
+
+function geometryToPolygons(geometry) {
+  if (!geometry) {
+    return [];
+  }
+
+  if (geometry.type === "Polygon") {
+    return [geometry.coordinates];
+  }
+
+  if (geometry.type === "MultiPolygon") {
+    return geometry.coordinates;
+  }
+
+  return [];
+}
+
+function normalizeLongitudeForTile(
+  longitude,
+  tileCenterLongitude
+) {
+  let normalized = longitude;
+
+  while (
+    normalized - tileCenterLongitude >
+    180
+  ) {
+    normalized -= 360;
+  }
+
+  while (
+    normalized - tileCenterLongitude <
+    -180
+  ) {
+    normalized += 360;
+  }
+
+  return normalized;
+}
+
+function ringToSvgPath(
+  ring,
+  level,
+  tileX,
+  tileY,
+  tileCenterLongitude
+) {
+  if (
+    !Array.isArray(ring) ||
+    ring.length < 3
+  ) {
+    return "";
+  }
+
+  const commands = [];
+
+  for (
+    let index = 0;
+    index < ring.length;
+    index += 1
+  ) {
+    const coordinate = ring[index];
+
+    if (
+      !Array.isArray(coordinate) ||
+      coordinate.length < 2
+    ) {
+      continue;
+    }
+
+    const longitude =
+      normalizeLongitudeForTile(
+        Number(coordinate[0]),
+        tileCenterLongitude
+      );
+
+    const latitude =
+      Number(coordinate[1]);
+
+    if (
+      !Number.isFinite(longitude) ||
+      !Number.isFinite(latitude)
+    ) {
+      continue;
+    }
+
+    const point =
+      coordinateToTilePixel(
+        longitude,
+        latitude,
+        level,
+        tileX,
+        tileY
+      );
+
+    const command =
+      commands.length === 0 ? "M" : "L";
+
+    commands.push(
+      `${command}${point.x.toFixed(2)} ` +
+        `${point.y.toFixed(2)}`
+    );
+  }
+
+  if (commands.length < 3) {
+    return "";
+  }
+
+  commands.push("Z");
+
+  return commands.join(" ");
+}
+
+function polygonToSvgPath(
+  polygon,
+  level,
+  tileX,
+  tileY,
+  tileCenterLongitude
+) {
+  if (!Array.isArray(polygon)) {
+    return "";
+  }
+
+  return polygon
+    .map((ring) =>
+      ringToSvgPath(
+        ring,
+        level,
+        tileX,
+        tileY,
+        tileCenterLongitude
+      )
+    )
+    .filter(Boolean)
+    .join(" ");
+}
+
+function createLandMaskSvg(
+  geoJson,
+  level,
+  tileX,
+  tileY
+) {
+  const bounds = tileBounds(
+    level,
+    tileX,
+    tileY
+  );
+
+  const tileCenterLongitude =
+    (bounds.west + bounds.east) / 2;
+
+  const paths = [];
+
+  for (const feature of geoJson.features) {
+    const polygons =
+      geometryToPolygons(
+        feature.geometry
+      );
+
+    for (const polygon of polygons) {
+      const pathData =
+        polygonToSvgPath(
+          polygon,
+          level,
+          tileX,
+          tileY,
+          tileCenterLongitude
+        );
+
+      if (!pathData) {
+        continue;
+      }
+
+      paths.push(
+        `<path d="${escapeXml(
+          pathData
+        )}" fill="white" fill-rule="evenodd"/>`
+      );
+    }
+  }
+
+  return Buffer.from(
+    [
+      `<svg`,
+      ` xmlns="http://www.w3.org/2000/svg"`,
+      ` width="${TILE_SIZE}"`,
+      ` height="${TILE_SIZE}"`,
+      ` viewBox="0 0 ${TILE_SIZE} ${TILE_SIZE}">`,
+      `<rect width="${TILE_SIZE}" height="${TILE_SIZE}" fill="black"/>`,
+      ...paths,
+      `</svg>`,
+    ].join("")
+  );
+}
+
+async function prepareLandMask(
+  geoJson,
+  level,
+  tileX,
+  tileY
+) {
+  const svg = createLandMaskSvg(
+    geoJson,
+    level,
+    tileX,
+    tileY
+  );
+
+  const mask = await sharp(svg)
+    .resize(TILE_SIZE, TILE_SIZE)
+    .greyscale()
+    .png()
+    .toBuffer();
+
+  const stats = await sharp(mask).stats();
+
+  const mean =
+    stats.channels?.[0]?.mean ?? 0;
+
+  return {
+    mask,
+    hasLand: mean > 0.5,
+  };
+}
+
 function groupMarksByTile(marks, level) {
-  const tiles = new Map();
+  const groups = new Map();
 
   for (const mark of marks) {
     const tileX = longitudeToTileX(
@@ -302,100 +569,287 @@ function groupMarksByTile(marks, level) {
 
     const key = `${tileX}:${tileY}`;
 
-    if (!tiles.has(key)) {
-      tiles.set(key, {
+    if (!groups.has(key)) {
+      groups.set(key, []);
+    }
+
+    groups.get(key).push(mark);
+  }
+
+  return groups;
+}
+
+function createAllTiles(
+  level,
+  groupedMarks
+) {
+  const tilesPerAxis = 2 ** level;
+  const tiles = [];
+
+  for (
+    let tileY = 0;
+    tileY < tilesPerAxis;
+    tileY += 1
+  ) {
+    for (
+      let tileX = 0;
+      tileX < tilesPerAxis;
+      tileX += 1
+    ) {
+      const key = `${tileX}:${tileY}`;
+
+      tiles.push({
         level,
         tileX,
         tileY,
-        marks: [],
+        marks:
+          groupedMarks.get(key) ?? [],
       });
     }
-
-    tiles.get(key).marks.push(mark);
   }
 
   return tiles;
 }
 
-async function buildTile(
-  tile,
-  markImages
-) {
-  const markCount = tile.marks.length;
-
-  if (markCount === 0) {
-    return null;
+function getPhotoCellSize(level) {
+  if (level === 0) {
+    return 32;
   }
 
-  const markSize = getMarkSize(
-    markCount,
-    tile.level
+  if (level === 1) {
+    return 40;
+  }
+
+  if (level === 2) {
+    return 48;
+  }
+
+  return 56;
+}
+
+function hashNumber(value) {
+  let hash = 2166136261;
+
+  const text = String(value);
+
+  for (
+    let index = 0;
+    index < text.length;
+    index += 1
+  ) {
+    hash ^= text.charCodeAt(index);
+
+    hash = Math.imul(
+      hash,
+      16777619
+    );
+  }
+
+  return hash >>> 0;
+}
+
+function getDeterministicImageIndex(
+  level,
+  tileX,
+  tileY,
+  cellX,
+  cellY,
+  imageCount
+) {
+  if (imageCount <= 1) {
+    return 0;
+  }
+
+  const hash = hashNumber(
+    [
+      level,
+      tileX,
+      tileY,
+      cellX,
+      cellY,
+    ].join(":")
+  );
+
+  return hash % imageCount;
+}
+
+async function preparePhotoSources(
+  markImages,
+  levels
+) {
+  const sources = [
+    ...markImages.entries(),
+  ];
+
+  const preparedByLevel = new Map();
+
+  for (const level of levels) {
+    const cellSize =
+      getPhotoCellSize(level);
+
+    const prepared = [];
+
+    for (const [markId, source] of sources) {
+      try {
+        const image = await sharp(source)
+          .rotate()
+          .resize(
+            cellSize,
+            cellSize,
+            {
+              fit: "cover",
+              position: "centre",
+            }
+          )
+          .webp({
+            quality: 82,
+          })
+          .toBuffer();
+
+        prepared.push({
+          markId,
+          image,
+        });
+      } catch (error) {
+        console.error(
+          `Could not prepare Mark ${markId} ` +
+            `for level ${level}:`,
+          error.message
+        );
+      }
+    }
+
+    preparedByLevel.set(
+      level,
+      prepared
+    );
+
+    console.log(
+      `Prepared ${prepared.length} photo source(s) ` +
+        `for level ${level}`
+    );
+  }
+
+  return preparedByLevel;
+}
+
+function createPhotoWallComposites(
+  tile,
+  preparedImages
+) {
+  if (preparedImages.length === 0) {
+    return [];
+  }
+
+  const cellSize =
+    getPhotoCellSize(tile.level);
+
+  const columns = Math.ceil(
+    TILE_SIZE / cellSize
+  );
+
+  const rows = Math.ceil(
+    TILE_SIZE / cellSize
   );
 
   const composites = [];
 
-  for (const mark of tile.marks) {
-    const source = markImages.get(
-      mark.id
-    );
-
-    if (!source) {
-      continue;
-    }
-
-    try {
-      const image = await sharp(source)
-        .resize(markSize, markSize, {
-          fit: "cover",
-        })
-        .webp({
-          quality: 82,
-        })
-        .toBuffer();
-
-      const position =
-        markPositionInsideTile(
-          mark.longitude,
-          mark.latitude,
+  for (
+    let cellY = 0;
+    cellY < rows;
+    cellY += 1
+  ) {
+    for (
+      let cellX = 0;
+      cellX < columns;
+      cellX += 1
+    ) {
+      const imageIndex =
+        getDeterministicImageIndex(
           tile.level,
           tile.tileX,
-          tile.tileY
+          tile.tileY,
+          cellX,
+          cellY,
+          preparedImages.length
         );
 
+      const source =
+        preparedImages[imageIndex];
+
       composites.push({
-        input: image,
-        left: Math.max(
-          0,
-          Math.min(
-            TILE_SIZE - markSize,
-            Math.round(
-              position.x -
-                markSize / 2
-            )
-          )
-        ),
-        top: Math.max(
-          0,
-          Math.min(
-            TILE_SIZE - markSize,
-            Math.round(
-              position.y -
-                markSize / 2
-            )
-          )
-        ),
+        input: source.image,
+        left: cellX * cellSize,
+        top: cellY * cellSize,
       });
-    } catch (error) {
-      console.error(
-        `Could not prepare Mark ${mark.id}:`,
-        error.message
-      );
     }
   }
 
-  if (composites.length === 0) {
+  return composites;
+}
+
+async function buildTile(
+  tile,
+  geoJson,
+  preparedImages
+) {
+  if (preparedImages.length === 0) {
     return null;
   }
+
+  const { mask, hasLand } =
+    await prepareLandMask(
+      geoJson,
+      tile.level,
+      tile.tileX,
+      tile.tileY
+    );
+
+  if (!hasLand) {
+    return null;
+  }
+
+  const photoComposites =
+    createPhotoWallComposites(
+      tile,
+      preparedImages
+    );
+
+  if (photoComposites.length === 0) {
+    return null;
+  }
+
+  const photoWall =
+    await sharp({
+      create: {
+        width: TILE_SIZE,
+        height: TILE_SIZE,
+        channels: 4,
+        background: {
+          r: 0,
+          g: 0,
+          b: 0,
+          alpha: 0,
+        },
+      },
+    })
+      .composite(photoComposites)
+      .png()
+      .toBuffer();
+
+  const maskedTile =
+    await sharp(photoWall)
+      .composite([
+        {
+          input: mask,
+          blend: "dest-in",
+        },
+      ])
+      .webp({
+        quality: 88,
+        alphaQuality: 100,
+      })
+      .toBuffer();
 
   const outputPath = path.join(
     OUTPUT_DIR,
@@ -410,29 +864,18 @@ async function buildTile(
     }
   );
 
-  await sharp({
-    create: {
-      width: TILE_SIZE,
-      height: TILE_SIZE,
-      channels: 4,
-      background: {
-        r: 0,
-        g: 0,
-        b: 0,
-        alpha: 0,
-      },
-    },
-  })
-    .composite(composites)
-    .webp({
-      quality: 86,
-    })
-    .toFile(outputPath);
+  await fs.writeFile(
+    outputPath,
+    maskedTile
+  );
 
   return outputPath;
 }
 
-async function uploadTile(tile, outputPath) {
+async function uploadTile(
+  tile,
+  outputPath
+) {
   const {
     supabaseUrl,
   } = getSupabaseConfig();
@@ -543,6 +986,18 @@ async function clearPreviousOutput() {
 async function main() {
   await loadEnvironment();
 
+  console.log(
+    "Loading countries GeoJSON"
+  );
+
+  const geoJson =
+    await loadLandGeoJson();
+
+  console.log(
+    `Loaded ${geoJson.features.length} ` +
+      `geographic feature(s)`
+  );
+
   const marks = await loadPaidMarks();
 
   console.log(
@@ -567,25 +1022,53 @@ async function main() {
     `Downloaded ${markImages.size} Mark image(s)`
   );
 
+  if (markImages.size === 0) {
+    console.log(
+      "No Mark images could be downloaded"
+    );
+    return;
+  }
+
+  console.log(
+    "Preparing Photo Mosaic sources"
+  );
+
+  const preparedByLevel =
+    await preparePhotoSources(
+      markImages,
+      LEVELS
+    );
+
   await clearPreviousOutput();
 
   let totalTiles = 0;
 
   for (const level of LEVELS) {
-    const tiles = groupMarksByTile(
-      marks,
-      level
+    const groupedMarks =
+      groupMarksByTile(
+        marks,
+        level
+      );
+
+    const tiles = createAllTiles(
+      level,
+      groupedMarks
     );
+
+    const preparedImages =
+      preparedByLevel.get(level) ?? [];
 
     console.log(
-      `Level ${level}: building ${tiles.size} tile(s)`
+      `Level ${level}: checking ` +
+        `${tiles.length} tile(s)`
     );
 
-    for (const tile of tiles.values()) {
+    for (const tile of tiles) {
       const outputPath =
         await buildTile(
           tile,
-          markImages
+          geoJson,
+          preparedImages
         );
 
       if (!outputPath) {
@@ -609,7 +1092,7 @@ async function main() {
         [
           `Published level ${tile.level}`,
           `tile ${tile.tileX}:${tile.tileY}`,
-          `Marks: ${tile.marks.length}`,
+          `local Marks: ${tile.marks.length}`,
         ].join(" ")
       );
     }
@@ -617,7 +1100,7 @@ async function main() {
 
   console.log(
     `Generation complete: ` +
-      `${totalTiles} tile(s) published`
+      `${totalTiles} land tile(s) published`
   );
 }
 
