@@ -6,6 +6,9 @@ const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY!;
 
 const supabaseAdmin = createClient(supabaseUrl, supabaseSecretKey);
 
+const MARK_FIELDS =
+  "id, created_at, country, message, image_url, mark_number, longitude, latitude";
+
 const allowedImageTypes = new Set([
   "image/jpeg",
   "image/png",
@@ -14,13 +17,48 @@ const allowedImageTypes = new Set([
 
 const maxFileSize = 15 * 1024 * 1024;
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const numberValue = searchParams.get("number");
+
+    if (numberValue !== null) {
+      const markNumber = Number(numberValue);
+
+      if (
+        !Number.isSafeInteger(markNumber) ||
+        markNumber < 1
+      ) {
+        return NextResponse.json(
+          { error: "Invalid Mark number." },
+          { status: 400 }
+        );
+      }
+
+      const { data, error } = await supabaseAdmin
+        .from("marks")
+        .select(MARK_FIELDS)
+        .eq("status", "paid")
+        .eq("mark_number", markNumber)
+        .maybeSingle();
+
+      if (error) {
+        throw error;
+      }
+
+      if (!data) {
+        return NextResponse.json(
+          { error: "Mark not found." },
+          { status: 404 }
+        );
+      }
+
+      return NextResponse.json({ mark: data });
+    }
+
     const { data, error } = await supabaseAdmin
       .from("marks")
-      .select(
-        "id, created_at, country, message, image_url, mark_number, longitude, latitude"
-      )
+      .select(MARK_FIELDS)
       .eq("status", "paid")
       .not("mark_number", "is", null)
       .order("mark_number", { ascending: false })

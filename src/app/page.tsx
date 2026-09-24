@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import LeaveMarkModal from "../components/LeaveMarkModal";
 import MarksExperience from "../components/experience/MarksExperience";
 import type { PaidMark } from "../types/mark";
@@ -23,35 +24,142 @@ function getProjectDay() {
   );
 }
 
+function getMarkNumberFromPath(pathname: string) {
+  const match = pathname.match(/^\/(\d+)\/?$/);
+
+  if (!match) {
+    return null;
+  }
+
+  const markNumber = Number(match[1]);
+
+  if (!Number.isSafeInteger(markNumber) || markNumber < 1) {
+    return null;
+  }
+
+  return markNumber;
+}
+
 export default function Home() {
+  const router = useRouter();
+  const pathname = usePathname();
+
   const [marks, setMarks] = useState<PaidMark[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [joinOpen, setJoinOpen] = useState(false);
   const [dataError, setDataError] = useState("");
 
   useEffect(() => {
+    let cancelled = false;
+
     async function loadMarks() {
       try {
-        const response = await fetch("/api/marks", {
+        setDataError("");
+
+        const requestedMarkNumber = getMarkNumberFromPath(pathname);
+
+        const latestResponse = await fetch("/api/marks", {
           cache: "no-store",
         });
 
-        const result = await response.json();
+        const latestResult = await latestResponse.json();
 
-        if (!response.ok) {
-          throw new Error(result.error || "Could not load marks.");
+        if (!latestResponse.ok) {
+          throw new Error(
+            latestResult.error || "Could not load marks."
+          );
         }
 
-        setMarks(Array.isArray(result.marks) ? result.marks : []);
-      } catch (error) {
-        setDataError(
-          error instanceof Error ? error.message : "Could not load marks."
+        const latestMarks: PaidMark[] = Array.isArray(latestResult.marks)
+          ? latestResult.marks
+          : [];
+
+        if (requestedMarkNumber === null) {
+          if (!cancelled) {
+            setMarks(latestMarks);
+            setSelectedIndex(0);
+          }
+
+          return;
+        }
+
+        const existingIndex = latestMarks.findIndex(
+          (mark) => mark.mark_number === requestedMarkNumber
         );
+
+        if (existingIndex >= 0) {
+          if (!cancelled) {
+            setMarks(latestMarks);
+            setSelectedIndex(existingIndex);
+          }
+
+          return;
+        }
+
+        const markResponse = await fetch(
+          `/api/marks?number=${requestedMarkNumber}`,
+          {
+            cache: "no-store",
+          }
+        );
+
+        const markResult = await markResponse.json();
+
+        if (markResponse.status === 404) {
+          if (!cancelled) {
+            setMarks(latestMarks);
+            setSelectedIndex(0);
+            setDataError(`MARK #${requestedMarkNumber} WAS NOT FOUND`);
+          }
+
+          return;
+        }
+
+        if (!markResponse.ok) {
+          throw new Error(
+            markResult.error || "Could not load this Mark."
+          );
+        }
+
+        const requestedMark = markResult.mark as PaidMark;
+
+        if (!cancelled) {
+          setMarks([requestedMark, ...latestMarks]);
+          setSelectedIndex(0);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setDataError(
+            error instanceof Error
+              ? error.message
+              : "Could not load marks."
+          );
+        }
       }
     }
 
     loadMarks();
-  }, []);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname]);
+
+  function selectMark(index: number) {
+    const mark = marks[index];
+
+    if (!mark) {
+      return;
+    }
+
+    setSelectedIndex(index);
+
+    const nextPath = `/${mark.mark_number}`;
+
+    if (pathname !== nextPath) {
+      router.push(nextPath);
+    }
+  }
 
   const projectDay = getProjectDay();
   const marksLabel = marks.length === 1 ? "MARK SO FAR" : "MARKS SO FAR";
@@ -77,10 +185,21 @@ export default function Home() {
           </div>
 
           <nav className="hidden items-center gap-7 text-[8px] tracking-[0.19em] text-white/35 lg:flex">
-            <button className="transition hover:text-white">EXPLORE</button>
-            <button className="transition hover:text-white">COUNTRIES</button>
-            <button className="transition hover:text-white">RANDOM</button>
-            <button className="transition hover:text-white">ABOUT</button>
+            <button className="transition hover:text-white">
+              EXPLORE
+            </button>
+
+            <button className="transition hover:text-white">
+              COUNTRIES
+            </button>
+
+            <button className="transition hover:text-white">
+              RANDOM
+            </button>
+
+            <button className="transition hover:text-white">
+              ABOUT
+            </button>
           </nav>
 
           <button
@@ -130,7 +249,7 @@ export default function Home() {
           <MarksExperience
             marks={marks}
             selectedIndex={selectedIndex}
-            onSelect={setSelectedIndex}
+            onSelect={selectMark}
           />
         </div>
 
@@ -180,7 +299,7 @@ export default function Home() {
 
           {dataError && (
             <p className="mt-3 text-center text-[7px] tracking-[0.15em] text-red-300/70">
-              LIVE MARKS COULD NOT BE LOADED
+              {dataError}
             </p>
           )}
         </div>
