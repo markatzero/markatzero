@@ -20,7 +20,9 @@ const maxFileSize = 15 * 1024 * 1024;
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
+
     const numberValue = searchParams.get("number");
+    const randomValue = searchParams.get("random");
 
     if (numberValue !== null) {
       const markNumber = Number(numberValue);
@@ -54,6 +56,78 @@ export async function GET(request: Request) {
       }
 
       return NextResponse.json({ mark: data });
+    }
+
+    if (randomValue === "true") {
+      const { data: firstMark, error: firstError } =
+        await supabaseAdmin
+          .from("marks")
+          .select("mark_number")
+          .eq("status", "paid")
+          .not("mark_number", "is", null)
+          .order("mark_number", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+
+      if (firstError) {
+        throw firstError;
+      }
+
+      const { data: lastMark, error: lastError } =
+        await supabaseAdmin
+          .from("marks")
+          .select("mark_number")
+          .eq("status", "paid")
+          .not("mark_number", "is", null)
+          .order("mark_number", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+      if (lastError) {
+        throw lastError;
+      }
+
+      if (
+        !firstMark?.mark_number ||
+        !lastMark?.mark_number
+      ) {
+        return NextResponse.json(
+          { error: "No Marks are available yet." },
+          { status: 404 }
+        );
+      }
+
+      const firstNumber = firstMark.mark_number;
+      const lastNumber = lastMark.mark_number;
+
+      const randomNumber =
+        Math.floor(
+          Math.random() * (lastNumber - firstNumber + 1)
+        ) + firstNumber;
+
+      const { data: randomMark, error: randomError } =
+        await supabaseAdmin
+          .from("marks")
+          .select(MARK_FIELDS)
+          .eq("status", "paid")
+          .not("mark_number", "is", null)
+          .gte("mark_number", randomNumber)
+          .order("mark_number", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+
+      if (randomError) {
+        throw randomError;
+      }
+
+      if (!randomMark) {
+        return NextResponse.json(
+          { error: "No Mark could be selected." },
+          { status: 404 }
+        );
+      }
+
+      return NextResponse.json({ mark: randomMark });
     }
 
     const { data, error } = await supabaseAdmin

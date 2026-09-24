@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import LeaveMarkModal from "../components/LeaveMarkModal";
 import MarksExperience from "../components/experience/MarksExperience";
@@ -47,7 +47,10 @@ export default function Home() {
   const [marks, setMarks] = useState<PaidMark[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [joinOpen, setJoinOpen] = useState(false);
+  const [findOpen, setFindOpen] = useState(false);
+  const [findValue, setFindValue] = useState("");
   const [dataError, setDataError] = useState("");
+  const [randomLoading, setRandomLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -109,7 +112,9 @@ export default function Home() {
           if (!cancelled) {
             setMarks(latestMarks);
             setSelectedIndex(0);
-            setDataError(`MARK #${requestedMarkNumber} WAS NOT FOUND`);
+            setDataError(
+              `MARK #${requestedMarkNumber} WAS NOT FOUND`
+            );
           }
 
           return;
@@ -161,6 +166,71 @@ export default function Home() {
     }
   }
 
+  async function openRandomMark() {
+    if (randomLoading) {
+      return;
+    }
+
+    try {
+      setRandomLoading(true);
+      setDataError("");
+
+      const response = await fetch("/api/marks?random=true", {
+        cache: "no-store",
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.error || "Could not find a random Mark."
+        );
+      }
+
+      const randomMark = result.mark as PaidMark;
+
+      router.push(`/${randomMark.mark_number}`);
+    } catch (error) {
+      setDataError(
+        error instanceof Error
+          ? error.message
+          : "Could not find a random Mark."
+      );
+    } finally {
+      setRandomLoading(false);
+    }
+  }
+
+  function openFindMark() {
+    setDataError("");
+    setFindOpen(true);
+  }
+
+  function closeFindMark() {
+    setFindOpen(false);
+    setFindValue("");
+  }
+
+  function submitFindMark(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const markNumber = Number(findValue);
+
+    if (
+      !Number.isSafeInteger(markNumber) ||
+      markNumber < 1
+    ) {
+      setDataError("ENTER A VALID MARK NUMBER");
+      return;
+    }
+
+    setDataError("");
+    setFindOpen(false);
+    setFindValue("");
+
+    router.push(`/${markNumber}`);
+  }
+
   const projectDay = getProjectDay();
   const marksLabel = marks.length === 1 ? "MARK SO FAR" : "MARKS SO FAR";
 
@@ -185,19 +255,33 @@ export default function Home() {
           </div>
 
           <nav className="hidden items-center gap-7 text-[8px] tracking-[0.19em] text-white/35 lg:flex">
-            <button className="transition hover:text-white">
+            <button
+              type="button"
+              className="transition hover:text-white"
+            >
               EXPLORE
             </button>
 
-            <button className="transition hover:text-white">
+            <button
+              type="button"
+              className="transition hover:text-white"
+            >
               COUNTRIES
             </button>
 
-            <button className="transition hover:text-white">
-              RANDOM
+            <button
+              type="button"
+              onClick={openRandomMark}
+              disabled={randomLoading}
+              className="transition hover:text-white disabled:opacity-30"
+            >
+              {randomLoading ? "LOADING" : "RANDOM"}
             </button>
 
-            <button className="transition hover:text-white">
+            <button
+              type="button"
+              className="transition hover:text-white"
+            >
               ABOUT
             </button>
           </nav>
@@ -276,9 +360,11 @@ export default function Home() {
             <div className="flex flex-wrap justify-center gap-2">
               <button
                 type="button"
-                className="rounded-full border border-white/[0.09] px-4 py-2 text-[7px] tracking-[0.13em] text-white/35 transition hover:border-white/25 hover:text-white"
+                onClick={openRandomMark}
+                disabled={randomLoading}
+                className="rounded-full border border-white/[0.09] px-4 py-2 text-[7px] tracking-[0.13em] text-white/35 transition hover:border-white/25 hover:text-white disabled:opacity-30"
               >
-                RANDOM MARK
+                {randomLoading ? "LOADING..." : "RANDOM MARK"}
               </button>
 
               <button
@@ -290,6 +376,7 @@ export default function Home() {
 
               <button
                 type="button"
+                onClick={openFindMark}
                 className="rounded-full border border-white/[0.09] px-4 py-2 text-[7px] tracking-[0.13em] text-white/35 transition hover:border-white/25 hover:text-white"
               >
                 FIND A MARK · #
@@ -326,6 +413,74 @@ export default function Home() {
           </div>
         </div>
       </footer>
+
+      {findOpen && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 px-5 backdrop-blur-md"
+          onMouseDown={(event) => {
+            if (event.currentTarget === event.target) {
+              closeFindMark();
+            }
+          }}
+        >
+          <div className="w-full max-w-[360px] rounded-[20px] border border-white/[0.12] bg-[#090d13] p-6 shadow-[0_30px_100px_rgba(0,0,0,0.8)]">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[7px] tracking-[0.3em] text-white/30">
+                  FIND A MARK
+                </p>
+
+                <p className="mt-2 text-[18px] tracking-[-0.02em] text-white/90">
+                  Enter its number.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={closeFindMark}
+                aria-label="Close"
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 text-[14px] text-white/35 transition hover:border-white/30 hover:text-white"
+              >
+                ×
+              </button>
+            </div>
+
+            <form
+              onSubmit={submitFindMark}
+              className="mt-6 flex items-center gap-2"
+            >
+              <div className="flex min-w-0 flex-1 items-center rounded-full border border-white/[0.13] bg-white/[0.035] px-4">
+                <span className="text-[13px] text-white/25">#</span>
+
+                <input
+                  autoFocus
+                  type="number"
+                  min="1"
+                  step="1"
+                  inputMode="numeric"
+                  value={findValue}
+                  onChange={(event) =>
+                    setFindValue(event.target.value)
+                  }
+                  placeholder="18427"
+                  className="h-11 min-w-0 flex-1 bg-transparent px-2 text-[13px] text-white outline-none placeholder:text-white/15"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="h-11 rounded-full bg-white px-5 text-[8px] font-semibold tracking-[0.16em] text-black transition hover:scale-[1.02]"
+              >
+                GO
+              </button>
+            </form>
+
+            <p className="mt-4 text-[6px] leading-4 tracking-[0.13em] text-white/20">
+              EVERY MARK HAS ONE PERMANENT NUMBER.
+            </p>
+          </div>
+        </div>
+      )}
 
       {joinOpen && (
         <LeaveMarkModal onClose={() => setJoinOpen(false)} />
