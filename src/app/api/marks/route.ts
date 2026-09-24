@@ -23,6 +23,8 @@ export async function GET(request: Request) {
 
     const numberValue = searchParams.get("number");
     const randomValue = searchParams.get("random");
+    const countriesValue = searchParams.get("countries");
+    const countryValue = searchParams.get("country");
 
     if (numberValue !== null) {
       const markNumber = Number(numberValue);
@@ -130,6 +132,49 @@ export async function GET(request: Request) {
       return NextResponse.json({ mark: randomMark });
     }
 
+    if (countriesValue === "true") {
+      const { data, error } = await supabaseAdmin.rpc(
+        "get_mark_countries"
+      );
+
+      if (error) {
+        throw error;
+      }
+
+      return NextResponse.json({
+        countries: data ?? [],
+      });
+    }
+
+    if (countryValue !== null) {
+      const country = countryValue.trim();
+
+      if (!country || country.length > 100) {
+        return NextResponse.json(
+          { error: "Invalid country." },
+          { status: 400 }
+        );
+      }
+
+      const { data, error } = await supabaseAdmin
+        .from("marks")
+        .select(MARK_FIELDS)
+        .eq("status", "paid")
+        .not("mark_number", "is", null)
+        .eq("country", country)
+        .order("mark_number", { ascending: false })
+        .limit(10);
+
+      if (error) {
+        throw error;
+      }
+
+      return NextResponse.json({
+        country,
+        marks: data ?? [],
+      });
+    }
+
     const { data, error } = await supabaseAdmin
       .from("marks")
       .select(MARK_FIELDS)
@@ -200,7 +245,10 @@ export async function POST(request: Request) {
 
     if (imageValue.size > maxFileSize) {
       return NextResponse.json(
-        { error: "This image is over 15 MB. Please choose a smaller image." },
+        {
+          error:
+            "This image is over 15 MB. Please choose a smaller image.",
+        },
         { status: 400 }
       );
     }
@@ -248,7 +296,10 @@ export async function POST(request: Request) {
       throw error;
     }
 
-    return NextResponse.json({ mark: data }, { status: 201 });
+    return NextResponse.json(
+      { mark: data },
+      { status: 201 }
+    );
   } catch (error) {
     if (uploadedPath) {
       await supabaseAdmin.storage.from("marks").remove([uploadedPath]);
