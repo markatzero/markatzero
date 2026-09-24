@@ -1,18 +1,36 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import LeaveMarkModal from "../components/LeaveMarkModal";
-import WorldMap from "../components/map/WorldMap";
+import MarksExperience from "../components/experience/MarksExperience";
 import type { PaidMark } from "../types/mark";
 
+const PROJECT_START = new Date("2026-10-01T00:00:00");
+
+function getProjectDay() {
+  const now = new Date();
+
+  if (now < PROJECT_START) {
+    return 0;
+  }
+
+  const millisecondsPerDay = 1000 * 60 * 60 * 24;
+
+  return (
+    Math.floor(
+      (now.getTime() - PROJECT_START.getTime()) / millisecondsPerDay
+    ) + 1
+  );
+}
+
 export default function Home() {
-  const [paidMarks, setPaidMarks] = useState<PaidMark[]>([]);
+  const [marks, setMarks] = useState<PaidMark[]>([]);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [joinOpen, setJoinOpen] = useState(false);
   const [dataError, setDataError] = useState("");
 
-  const [joinOpen, setJoinOpen] = useState(false);
-
   useEffect(() => {
-    async function loadPaidMarks() {
+    async function loadMarks() {
       try {
         const response = await fetch("/api/marks", {
           cache: "no-store",
@@ -24,7 +42,7 @@ export default function Home() {
           throw new Error(result.error || "Could not load marks.");
         }
 
-        setPaidMarks(Array.isArray(result.marks) ? result.marks : []);
+        setMarks(Array.isArray(result.marks) ? result.marks : []);
       } catch (error) {
         setDataError(
           error instanceof Error ? error.message : "Could not load marks."
@@ -32,219 +50,167 @@ export default function Home() {
       }
     }
 
-    loadPaidMarks();
+    loadMarks();
   }, []);
 
-
-  const totalMarks = paidMarks.length;
-
-  const countryTotals = useMemo(() => {
-    const totals = new Map<string, number>();
-
-    paidMarks.forEach((mark) => {
-      totals.set(mark.country, (totals.get(mark.country) ?? 0) + 1);
-    });
-
-    return Array.from(totals.entries())
-      .map(([name, total]) => ({ name, total }))
-      .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
-  }, [paidMarks]);
-
-  const totalCountries = countryTotals.length;
-  const topCountries = countryTotals.slice(0, 5);
-  const recentMarks = paidMarks.slice(0, 4);
-
-  function openJoin() {
-    setJoinOpen(true);
-  }
+  const projectDay = getProjectDay();
+  const marksLabel = marks.length === 1 ? "MARK SO FAR" : "MARKS SO FAR";
 
   return (
-    <main className="min-h-screen bg-[#02050d] text-white">
-      <header className="border-b border-white/[0.07] bg-[#02050d]">
-        <div className="mx-auto flex max-w-[1600px] items-center justify-between px-5 py-5 md:px-8">
-          <div className="flex items-center gap-5">
-            <div>
-              <div className="text-3xl font-semibold tracking-[0.08em] md:text-4xl">
-                00:00:00
-              </div>
-
-              <div className="mt-1 text-[8px] tracking-[0.34em] text-cyan-300/70">
-                MARK AT ZERO
-              </div>
+    <main className="min-h-screen overflow-x-hidden bg-[#05070b] text-white">
+      <header className="relative z-50 border-b border-white/[0.055] bg-[#05070b]/95 backdrop-blur-xl">
+        <div className="mx-auto flex h-[58px] max-w-[1500px] items-center justify-between px-5 md:px-8">
+          <div className="flex items-center gap-3">
+            <div className="flex h-7 w-7 items-center justify-center rounded-full border border-white/20">
+              <span className="h-1.5 w-1.5 rounded-full bg-white" />
             </div>
 
-            <div className="hidden h-10 w-px bg-white/10 md:block" />
+            <div>
+              <p className="text-[11px] font-semibold tracking-[0.23em]">
+                MARK AT ZERO
+              </p>
 
-            <p className="hidden text-[10px] tracking-[0.24em] text-slate-400 md:block">
-              ONE MILLION PEOPLE. ONE MOMENT.
-            </p>
+              <p className="mt-0.5 hidden text-[6px] tracking-[0.26em] text-white/25 sm:block">
+                LEAVE SOMETHING HUMAN BEHIND
+              </p>
+            </div>
           </div>
 
-          <nav className="hidden items-center gap-7 text-[11px] tracking-wider text-slate-400 lg:flex">
-            <span className="text-white">WORLD</span>
-            <span>EXPLORE</span>
-            <span>TOP COUNTRIES</span>
-            <span>ABOUT</span>
+          <nav className="hidden items-center gap-7 text-[8px] tracking-[0.19em] text-white/35 lg:flex">
+            <button className="transition hover:text-white">EXPLORE</button>
+            <button className="transition hover:text-white">COUNTRIES</button>
+            <button className="transition hover:text-white">RANDOM</button>
+            <button className="transition hover:text-white">ABOUT</button>
           </nav>
 
           <button
             type="button"
-            onClick={openJoin}
-            className="rounded-full border border-cyan-300/40 bg-cyan-300/[0.06] px-5 py-2.5 text-xs tracking-wider text-cyan-100 transition hover:bg-cyan-300/[0.12]"
+            onClick={() => setJoinOpen(true)}
+            className="rounded-full bg-white px-4 py-2 text-[8px] font-semibold tracking-[0.13em] text-black transition hover:scale-[1.02]"
           >
-            JOIN NOW · €1
+            LEAVE YOUR MARK · €1
           </button>
         </div>
       </header>
 
-      <section className="mx-auto max-w-[1600px] px-4 py-5 md:px-8">
-        <div className="mb-4 grid grid-cols-3 overflow-hidden rounded-xl border border-white/[0.07] bg-white/[0.025]">
-          <div className="px-3 py-3 text-center">
-            <p className="text-[8px] tracking-[0.28em] text-slate-500">
-              PEOPLE
+      <section className="relative">
+        <div className="pointer-events-none absolute left-1/2 top-[150px] h-[500px] w-[1000px] -translate-x-1/2 rounded-full bg-white/[0.018] blur-[120px]" />
+
+        <div className="relative z-30 mx-auto max-w-[760px] px-5 pb-0 pt-7 text-center md:pt-8">
+          <p className="text-[7px] font-medium tracking-[0.4em] text-white/32 md:text-[8px]">
+            REAL PEOPLE. REAL MOMENTS.
+          </p>
+
+          <h1 className="mt-3 text-[36px] font-medium leading-[0.98] tracking-[-0.045em] sm:text-[43px] md:text-[50px]">
+            Leave something human behind.
+          </h1>
+
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+            <p className="text-[10px] tracking-[0.05em] text-white/45">
+              A photo. Ten words. One Mark.
             </p>
 
-            <p className="mt-1 text-lg font-medium md:text-xl">
-              {totalMarks.toLocaleString()}
-              <span className="ml-2 hidden text-[10px] font-normal text-slate-600 sm:inline">
-                / 1,000,000
-              </span>
+            <span className="hidden h-1 w-1 rounded-full bg-white/15 sm:block" />
+
+            <p className="text-[9px] tracking-[0.1em] text-white/27">
+              Alone or together.
             </p>
           </div>
 
-          <div className="border-x border-white/[0.07] px-3 py-3 text-center">
-            <p className="text-[8px] tracking-[0.28em] text-slate-500">
-              COUNTRIES
-            </p>
-
-            <p className="mt-1 text-lg font-medium md:text-xl">
-              {totalCountries.toLocaleString()}
-              <span className="ml-2 text-[10px] font-normal text-slate-600">
-                / 195
-              </span>
-            </p>
-          </div>
-
-          <div className="px-3 py-3 text-center">
-            <p className="text-[8px] tracking-[0.28em] text-slate-500">
-              MARKS
-            </p>
-
-            <p className="mt-1 text-lg font-medium md:text-xl">
-              {totalMarks.toLocaleString()}
-              <span className="ml-2 hidden text-[9px] font-normal text-cyan-400 sm:inline">
-                AND GROWING
-              </span>
-            </p>
-          </div>
+          <button
+            type="button"
+            onClick={() => setJoinOpen(true)}
+            className="mt-4 rounded-full bg-white px-6 py-2.5 text-[8px] font-semibold tracking-[0.14em] text-black transition hover:scale-[1.02]"
+          >
+            LEAVE YOUR MARK · €1
+          </button>
         </div>
 
-        {dataError && (
-          <div className="mb-4 rounded-xl border border-red-400/20 bg-red-400/[0.05] px-4 py-3 text-center text-[10px] text-red-300">
-            LIVE DATA COULD NOT BE LOADED
-          </div>
-        )}
+        <div className="relative z-10 -mt-1 md:-mt-2">
+          <MarksExperience
+            marks={marks}
+            selectedIndex={selectedIndex}
+            onSelect={setSelectedIndex}
+          />
+        </div>
 
-        <div className="grid gap-4 xl:grid-cols-[1fr_230px]">
-          <WorldMap paidMarks={paidMarks} totalMarks={totalMarks} onLeaveMark={openJoin} />
+        <div className="relative z-30 mx-auto -mt-1 max-w-[1050px] px-5 pb-4 md:-mt-2 md:px-8">
+          <div className="flex flex-col items-center justify-between gap-4 border-t border-white/[0.065] pt-4 md:flex-row">
+            <div className="text-center md:text-left">
+              <p className="leading-none">
+                <span className="text-[22px] font-medium tracking-[-0.03em]">
+                  {marks.length.toLocaleString()}
+                </span>
 
-          <aside className="hidden rounded-2xl border border-white/[0.08] bg-white/[0.025] p-5 xl:block">
-            <div className="flex items-center justify-between">
-              <p className="text-[9px] tracking-[0.25em] text-slate-400">
-                TOP COUNTRIES
+                <span className="ml-2 text-[7px] tracking-[0.22em] text-white/35">
+                  {marksLabel}
+                </span>
               </p>
 
-              <span className="text-[9px] text-cyan-400/60">LIVE</span>
+              <p className="mt-1.5 text-[6px] tracking-[0.18em] text-white/20">
+                {projectDay > 0
+                  ? `DAY ${projectDay} · LIVE SINCE 01 OCT 2026`
+                  : "LAUNCHING 01 OCT 2026"}
+              </p>
             </div>
 
-            <div className="mt-6 space-y-5 text-xs">
-              {topCountries.length > 0 ? (
-                topCountries.map((item, index) => (
-                  <div
-                    key={item.name}
-                    className="flex items-center justify-between border-b border-white/[0.05] pb-4"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-[9px] text-slate-600">
-                        {String(index + 1).padStart(2, "0")}
-                      </span>
+            <div className="flex flex-wrap justify-center gap-2">
+              <button
+                type="button"
+                className="rounded-full border border-white/[0.09] px-4 py-2 text-[7px] tracking-[0.13em] text-white/35 transition hover:border-white/25 hover:text-white"
+              >
+                RANDOM MARK
+              </button>
 
-                      <span className="text-[11px] text-slate-300">
-                        {item.name}
-                      </span>
-                    </div>
+              <button
+                type="button"
+                className="rounded-full border border-white/[0.09] px-4 py-2 text-[7px] tracking-[0.13em] text-white/35 transition hover:border-white/25 hover:text-white"
+              >
+                EXPLORE COUNTRIES
+              </button>
 
-                    <span className="text-[10px] text-cyan-300/80">
-                      {item.total.toLocaleString()}
-                    </span>
-                  </div>
-                ))
-              ) : (
-                <p className="text-[10px] leading-5 text-slate-600">
-                  NO PAID MARKS YET.
-                </p>
-              )}
+              <button
+                type="button"
+                className="rounded-full border border-white/[0.09] px-4 py-2 text-[7px] tracking-[0.13em] text-white/35 transition hover:border-white/25 hover:text-white"
+              >
+                FIND A MARK · #
+              </button>
             </div>
-
-            <p className="mt-7 text-[8px] leading-5 tracking-wider text-slate-600">
-              EVERY MARK BECOMES PART OF ONE GLOBAL MOMENT AT 00:00:00.
-            </p>
-          </aside>
-        </div>
-
-        <div className="mt-4 rounded-2xl border border-white/[0.07] bg-white/[0.02] px-5 py-4">
-          <div className="mb-3 flex items-center justify-between">
-            <p className="text-[9px] tracking-[0.25em] text-slate-500">
-              RECENT & FEATURED MARKS
-            </p>
-
-            <p className="text-[8px] tracking-wider text-cyan-400/60">
-              LIVE
-            </p>
           </div>
 
-          {recentMarks.length > 0 ? (
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-              {recentMarks.map((mark) => (
-                <div
-                  key={mark.id}
-                  className="rounded-xl border border-cyan-200/[0.08] bg-[#030b15] p-2 transition hover:border-cyan-300/25"
-                >
-                  <div className="aspect-[16/10] overflow-hidden rounded-lg border border-cyan-400/20 bg-cyan-400/[0.06]">
-                    <img
-                      src={mark.image_url}
-                      alt={`Mark #${mark.mark_number}`}
-                      className="h-full w-full object-cover"
-                    />
-                  </div>
-
-                  <div className="min-w-0 px-1 pb-1 pt-3">
-                    <p className="text-[10px] text-cyan-100">
-                      #{mark.mark_number}
-                    </p>
-
-                    <p className="mt-1 truncate text-[8px] tracking-wider text-slate-600">
-                      {mark.country}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="py-4 text-center text-[10px] text-slate-600">
-              NO PAID MARKS YET.
+          {dataError && (
+            <p className="mt-3 text-center text-[7px] tracking-[0.15em] text-red-300/70">
+              LIVE MARKS COULD NOT BE LOADED
             </p>
           )}
         </div>
-
-        <div className="py-8 text-center">
-          <p className="text-[9px] tracking-[0.35em] text-slate-600">
-            ONE MILLION IS THE FIRST MILESTONE · THE WORLD KEEPS GROWING
-          </p>
-        </div>
       </section>
 
-      {joinOpen && <LeaveMarkModal onClose={() => setJoinOpen(false)} />}
+      <footer className="mx-auto max-w-[1050px] px-5 pb-5 md:px-8">
+        <div className="flex flex-col items-center justify-between gap-3 border-t border-white/[0.045] pt-4 sm:flex-row">
+          <p className="text-[6px] tracking-[0.18em] text-white/17">
+            RESPECT THE MARK · RESPECT THE PEOPLE
+          </p>
+
+          <div className="flex gap-4 text-[6px] tracking-[0.14em] text-white/14">
+            <button className="transition hover:text-white/40">
+              CONTENT POLICY
+            </button>
+
+            <button className="transition hover:text-white/40">
+              PRIVACY
+            </button>
+
+            <button className="transition hover:text-white/40">
+              TERMS
+            </button>
+          </div>
+        </div>
+      </footer>
+
+      {joinOpen && (
+        <LeaveMarkModal onClose={() => setJoinOpen(false)} />
+      )}
     </main>
   );
 }
