@@ -1,13 +1,6 @@
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
-import { readFile } from "fs/promises";
-import path from "path";
-
-import {
-  getPermanentMarkCoordinates,
-  type CountryGeoJson,
-} from "../../../lib/map";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -15,18 +8,6 @@ const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SECRET_KEY!
 );
-
-async function loadCountriesGeoJson(): Promise<CountryGeoJson> {
-  const filePath = path.join(
-    process.cwd(),
-    "public",
-    "countries.geojson"
-  );
-
-  const file = await readFile(filePath, "utf8");
-
-  return JSON.parse(file) as CountryGeoJson;
-}
 
 export async function POST(request: Request) {
   try {
@@ -57,6 +38,7 @@ export async function POST(request: Request) {
 
     if (event.type === "checkout.session.completed") {
       const session = event.data.object as Stripe.Checkout.Session;
+
       const markId = Number(session.metadata?.mark_id);
 
       if (
@@ -64,48 +46,33 @@ export async function POST(request: Request) {
         markId > 0 &&
         session.payment_status === "paid"
       ) {
-        const { data: mark, error: markError } = await supabaseAdmin
-          .from("marks")
-          .select(
-            "id, status, mark_number, country, longitude, latitude"
-          )
-          .eq("id", markId)
-          .single();
+        const { data: mark, error: markError } =
+          await supabaseAdmin
+            .from("marks")
+            .select("id, status, mark_number")
+            .eq("id", markId)
+            .single();
 
         if (markError) {
           throw markError;
         }
 
         if (mark.status === "pending") {
-          const { data: lastMark, error: lastMarkError } =
-            await supabaseAdmin
-              .from("marks")
-              .select("mark_number")
-              .not("mark_number", "is", null)
-              .order("mark_number", { ascending: false })
-              .limit(1)
-              .maybeSingle();
+          const { data: nextNumber, error: numberError } =
+            await supabaseAdmin.rpc("next_mark_number");
 
-          if (lastMarkError) {
-            throw lastMarkError;
+          if (numberError) {
+            throw numberError;
           }
 
-          const nextMarkNumber =
-            (lastMark?.mark_number ?? 0) + 1;
+          const markNumber = Number(nextNumber);
 
-          const countriesGeoJson =
-            await loadCountriesGeoJson();
-
-          const coordinates =
-            getPermanentMarkCoordinates(
-              mark.country,
-              nextMarkNumber,
-              countriesGeoJson
-            );
-
-          if (!coordinates) {
+          if (
+            !Number.isSafeInteger(markNumber) ||
+            markNumber < 1
+          ) {
             throw new Error(
-              `Could not generate coordinates for country: ${mark.country}`
+              "Could not generate a permanent Mark number."
             );
           }
 
@@ -116,9 +83,9 @@ export async function POST(request: Request) {
               payment_id: session.payment_intent
                 ? String(session.payment_intent)
                 : session.id,
-              mark_number: nextMarkNumber,
-              longitude: coordinates.longitude,
-              latitude: coordinates.latitude,
+              mark_number: markNumber,
+              longitude: null,
+              latitude: null,
             })
             .eq("id", markId)
             .eq("status", "pending");

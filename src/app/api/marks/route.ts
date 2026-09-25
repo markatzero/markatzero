@@ -7,7 +7,7 @@ const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY!;
 const supabaseAdmin = createClient(supabaseUrl, supabaseSecretKey);
 
 const MARK_FIELDS =
-  "id, created_at, country, message, image_url, mark_number, longitude, latitude";
+  "id, created_at, country, country_code, message, image_url, mark_number, mark_type, longitude, latitude";
 
 const allowedImageTypes = new Set([
   "image/jpeg",
@@ -16,6 +16,21 @@ const allowedImageTypes = new Set([
 ]);
 
 const maxFileSize = 15 * 1024 * 1024;
+const maxMessageWords = 10;
+
+function countWords(value: string) {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return 0;
+  }
+
+  return trimmed.split(/\s+/).length;
+}
+
+function isValidCountryCode(value: string) {
+  return /^[A-Z]{2}$/.test(value);
+}
 
 export async function GET(request: Request) {
   try {
@@ -29,10 +44,7 @@ export async function GET(request: Request) {
     if (numberValue !== null) {
       const markNumber = Number(numberValue);
 
-      if (
-        !Number.isSafeInteger(markNumber) ||
-        markNumber < 1
-      ) {
+      if (!Number.isSafeInteger(markNumber) || markNumber < 1) {
         return NextResponse.json(
           { error: "Invalid Mark number." },
           { status: 400 }
@@ -89,10 +101,7 @@ export async function GET(request: Request) {
         throw lastError;
       }
 
-      if (
-        !firstMark?.mark_number ||
-        !lastMark?.mark_number
-      ) {
+      if (!firstMark?.mark_number || !lastMark?.mark_number) {
         return NextResponse.json(
           { error: "No Marks are available yet." },
           { status: 404 }
@@ -187,10 +196,12 @@ export async function GET(request: Request) {
       throw error;
     }
 
-    return NextResponse.json({ marks: data });
+    return NextResponse.json({ marks: data ?? [] });
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "Could not load marks.";
+      error instanceof Error
+        ? error.message
+        : "Could not load marks.";
 
     return NextResponse.json(
       { error: message },
@@ -206,32 +217,49 @@ export async function POST(request: Request) {
     const formData = await request.formData();
 
     const countryValue = formData.get("country");
+    const countryCodeValue = formData.get("country_code");
     const messageValue = formData.get("message");
     const imageValue = formData.get("image");
 
     const country =
-      typeof countryValue === "string" ? countryValue.trim() : "";
+      typeof countryValue === "string"
+        ? countryValue.trim()
+        : "";
+
+    const countryCode =
+      typeof countryCodeValue === "string"
+        ? countryCodeValue.trim().toUpperCase()
+        : "";
 
     const message =
-      typeof messageValue === "string" ? messageValue.trim() : "";
+      typeof messageValue === "string"
+        ? messageValue.trim()
+        : "";
 
-    if (!country) {
+    if (!country || country.length > 100) {
       return NextResponse.json(
-        { error: "Country is required." },
+        { error: "Please choose your country." },
         { status: 400 }
       );
     }
 
-    if (message.length > 80) {
+    if (!isValidCountryCode(countryCode)) {
       return NextResponse.json(
-        { error: "Message must be 80 characters or less." },
+        { error: "Invalid country code." },
+        { status: 400 }
+      );
+    }
+
+    if (countWords(message) > maxMessageWords) {
+      return NextResponse.json(
+        { error: "Message must be 10 words or less." },
         { status: 400 }
       );
     }
 
     if (!(imageValue instanceof File) || imageValue.size === 0) {
       return NextResponse.json(
-        { error: "Image is required." },
+        { error: "Please choose a photo for your Mark." },
         { status: 400 }
       );
     }
@@ -280,7 +308,9 @@ export async function POST(request: Request) {
     const { data, error } = await supabaseAdmin
       .from("marks")
       .insert({
+        mark_type: "my",
         country,
+        country_code: countryCode,
         message: message || null,
         image_url: publicUrlData.publicUrl,
         status: "pending",
@@ -291,7 +321,10 @@ export async function POST(request: Request) {
       .single();
 
     if (error) {
-      await supabaseAdmin.storage.from("marks").remove([uploadedPath]);
+      await supabaseAdmin.storage
+        .from("marks")
+        .remove([uploadedPath]);
+
       uploadedPath = null;
       throw error;
     }
@@ -302,11 +335,15 @@ export async function POST(request: Request) {
     );
   } catch (error) {
     if (uploadedPath) {
-      await supabaseAdmin.storage.from("marks").remove([uploadedPath]);
+      await supabaseAdmin.storage
+        .from("marks")
+        .remove([uploadedPath]);
     }
 
     const message =
-      error instanceof Error ? error.message : "Invalid request.";
+      error instanceof Error
+        ? error.message
+        : "Invalid request.";
 
     return NextResponse.json(
       { error: message },
