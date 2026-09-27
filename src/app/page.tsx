@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import LeaveMarkModal from "../components/LeaveMarkModal";
+import MarkTypeChoice from "../components/MarkTypeChoice";
 import MarksExperience from "../components/experience/MarksExperience";
 import type { PaidMark } from "../types/mark";
 
@@ -53,6 +54,7 @@ export default function Home() {
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   const [joinOpen, setJoinOpen] = useState(false);
+  const [markChoiceOpen, setMarkChoiceOpen] = useState(false);
 
   const [findOpen, setFindOpen] = useState(false);
   const [findValue, setFindValue] = useState("");
@@ -428,7 +430,7 @@ export default function Home() {
 
           <button
             type="button"
-            onClick={() => setJoinOpen(true)}
+            onClick={() => setMarkChoiceOpen(true)}
             className="rounded-full bg-white px-4 py-2 text-[8px] font-semibold tracking-[0.13em] text-black transition hover:scale-[1.02]"
           >
             LEAVE YOUR MARK · €1
@@ -462,7 +464,7 @@ export default function Home() {
 
           <button
             type="button"
-            onClick={() => setJoinOpen(true)}
+            onClick={() => setMarkChoiceOpen(true)}
             className="mt-4 rounded-full bg-white px-6 py-2.5 text-[8px] font-semibold tracking-[0.14em] text-black transition hover:scale-[1.02]"
           >
             LEAVE YOUR MARK · €1
@@ -826,6 +828,17 @@ export default function Home() {
             </p>
           </div>
         </div>
+      )}
+
+      {markChoiceOpen && (
+        <MarkTypeChoice
+          onClose={() => setMarkChoiceOpen(false)}
+          onMyMark={() => {
+            setMarkChoiceOpen(false);
+            setJoinOpen(true);
+          }}
+          onOurMark={() => router.push("/our")}
+        />
       )}
 
       {joinOpen && (
