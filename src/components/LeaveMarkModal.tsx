@@ -363,7 +363,7 @@ export default function LeaveMarkModal({
       formData.append("country_code", selectedCountry.code);
       formData.append("message", message.trim());
       formData.append("image", markFile);
-
+formData.append("policy_accepted", "true");
       const markResponse = await fetch("/api/marks", {
         method: "POST",
         body: formData,

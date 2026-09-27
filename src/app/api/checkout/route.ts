@@ -37,15 +37,20 @@ export async function POST(request: Request) {
       metadata: {
         mark_id: String(markId),
       },
-      success_url: `${origin}/?payment=success&mark=${markId}`,
-      cancel_url: `${origin}/?payment=cancelled&mark=${markId}`,
+      success_url: `${origin}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/?payment=cancelled`,
     });
 
     return NextResponse.json({ url: session.url });
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "Could not create checkout.";
+      error instanceof Error
+        ? error.message
+        : "Could not create checkout.";
 
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      { error: message },
+      { status: 500 }
+    );
   }
 }

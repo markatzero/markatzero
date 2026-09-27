@@ -17,6 +17,7 @@ const allowedImageTypes = new Set([
 
 const maxFileSize = 15 * 1024 * 1024;
 const maxMessageWords = 10;
+const currentPolicyVersion = "2026-09-27";
 
 function countWords(value: string) {
   const trimmed = value.trim();
@@ -220,6 +221,7 @@ export async function POST(request: Request) {
     const countryCodeValue = formData.get("country_code");
     const messageValue = formData.get("message");
     const imageValue = formData.get("image");
+    const policyAcceptedValue = formData.get("policy_accepted");
 
     const country =
       typeof countryValue === "string"
@@ -235,6 +237,18 @@ export async function POST(request: Request) {
       typeof messageValue === "string"
         ? messageValue.trim()
         : "";
+
+    const policyAccepted = policyAcceptedValue === "true";
+
+    if (!policyAccepted) {
+      return NextResponse.json(
+        {
+          error:
+            "You must accept the content rules before creating a Mark.",
+        },
+        { status: 400 }
+      );
+    }
 
     if (!country || country.length > 100) {
       return NextResponse.json(
@@ -316,6 +330,8 @@ export async function POST(request: Request) {
         status: "pending",
         payment_id: null,
         mark_number: null,
+        policy_accepted_at: new Date().toISOString(),
+        policy_version: currentPolicyVersion,
       })
       .select()
       .single();

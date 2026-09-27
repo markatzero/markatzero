@@ -38,7 +38,6 @@ export async function POST(request: Request) {
 
     if (event.type === "checkout.session.completed") {
       const session = event.data.object as Stripe.Checkout.Session;
-
       const markId = Number(session.metadata?.mark_id);
 
       if (
@@ -46,53 +45,26 @@ export async function POST(request: Request) {
         markId > 0 &&
         session.payment_status === "paid"
       ) {
-        const { data: mark, error: markError } =
-          await supabaseAdmin
-            .from("marks")
-            .select("id, status, mark_number")
-            .eq("id", markId)
-            .single();
+        const paymentId = session.payment_intent
+          ? String(session.payment_intent)
+          : session.id;
 
-        if (markError) {
-          throw markError;
+        const { data: markNumber, error: finalizeError } =
+          await supabaseAdmin.rpc("finalize_paid_mark", {
+            p_mark_id: markId,
+            p_payment_id: paymentId,
+          });
+
+        if (finalizeError) {
+          throw finalizeError;
         }
 
-        if (mark.status === "pending") {
-          const { data: nextNumber, error: numberError } =
-            await supabaseAdmin.rpc("next_mark_number");
-
-          if (numberError) {
-            throw numberError;
-          }
-
-          const markNumber = Number(nextNumber);
-
-          if (
-            !Number.isSafeInteger(markNumber) ||
-            markNumber < 1
-          ) {
-            throw new Error(
-              "Could not generate a permanent Mark number."
-            );
-          }
-
-          const { error: updateError } = await supabaseAdmin
-            .from("marks")
-            .update({
-              status: "paid",
-              payment_id: session.payment_intent
-                ? String(session.payment_intent)
-                : session.id,
-              mark_number: markNumber,
-              longitude: null,
-              latitude: null,
-            })
-            .eq("id", markId)
-            .eq("status", "pending");
-
-          if (updateError) {
-            throw updateError;
-          }
+        if (
+          markNumber !== null &&
+          (!Number.isSafeInteger(Number(markNumber)) ||
+            Number(markNumber) < 1)
+        ) {
+          throw new Error("Invalid permanent Mark number.");
         }
       }
     }
@@ -100,13 +72,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ received: true });
   } catch (error) {
     const message =
-      error instanceof Error
-        ? error.message
-        : "Webhook failed.";
+      error instanceof Error ? error.message : "Webhook failed.";
 
-    return NextResponse.json(
-      { error: message },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 }
