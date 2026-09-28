@@ -400,6 +400,10 @@ export default function MarksExperience({
               <div className="relative z-10 -ml-3 my-3 flex min-w-0 flex-1 flex-col justify-between rounded-r-[16px] border border-l-0 border-white/[0.13] bg-[#080c12]/90 py-5 pl-8 pr-5 shadow-[0_20px_70px_rgba(0,0,0,0.65)] backdrop-blur-2xl">
                 <div>
                   <p className="text-[7px] tracking-[0.32em] text-white/40">
+                    {selectedMark.mark_type === "our" ? "OUR MARK" : "MY MARK"}
+                  </p>
+
+                  <p className="mt-2 text-[7px] tracking-[0.32em] text-white/40">
                     MARK #{selectedMark.mark_number.toLocaleString()}
                   </p>
 
