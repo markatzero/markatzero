@@ -51,6 +51,7 @@ export default function Home() {
   const pathname = usePathname();
 
   const [marks, setMarks] = useState<PaidMark[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   const [joinOpen, setJoinOpen] = useState(false);
@@ -95,6 +96,15 @@ export default function Home() {
         const latestMarks: PaidMark[] = Array.isArray(latestResult.marks)
           ? latestResult.marks
           : [];
+
+        const latestTotalCount =
+          typeof latestResult.totalCount === "number"
+            ? latestResult.totalCount
+            : latestMarks.length;
+
+        if (!cancelled) {
+          setTotalCount(latestTotalCount);
+        }
 
         if (requestedMarkNumber === null) {
           if (!cancelled) {
@@ -369,7 +379,7 @@ export default function Home() {
 
   const projectDay = getProjectDay();
   const marksLabel =
-    marks.length === 1 ? "MARK SO FAR" : "MARKS SO FAR";
+    totalCount === 1 ? "MARK SO FAR" : "MARKS SO FAR";
 
   const selectedCountrySummary = countries.find(
     (item) => item.country === selectedCountry
@@ -484,7 +494,7 @@ export default function Home() {
             <div className="text-center md:text-left">
               <p className="leading-none">
                 <span className="text-[22px] font-medium tracking-[-0.03em]">
-                  {marks.length.toLocaleString()}
+                  {totalCount.toLocaleString()}
                 </span>
 
                 <span className="ml-2 text-[7px] tracking-[0.22em] text-white/35">
