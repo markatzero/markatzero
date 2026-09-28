@@ -185,19 +185,34 @@ export async function GET(request: Request) {
       });
     }
 
-    const { data, error } = await supabaseAdmin
-      .from("marks")
-      .select(MARK_FIELDS)
-      .eq("status", "paid")
-      .not("mark_number", "is", null)
-      .order("mark_number", { ascending: false })
-      .limit(10);
+    const [{ data, error }, { count, error: countError }] =
+      await Promise.all([
+        supabaseAdmin
+          .from("marks")
+          .select(MARK_FIELDS)
+          .eq("status", "paid")
+          .not("mark_number", "is", null)
+          .order("mark_number", { ascending: false })
+          .limit(10),
+        supabaseAdmin
+          .from("marks")
+          .select("*", { count: "exact", head: true })
+          .eq("status", "paid")
+          .not("mark_number", "is", null),
+      ]);
 
     if (error) {
       throw error;
     }
 
-    return NextResponse.json({ marks: data ?? [] });
+    if (countError) {
+      throw countError;
+    }
+
+    return NextResponse.json({
+      marks: data ?? [],
+      totalCount: count ?? 0,
+    });
   } catch (error) {
     const message =
       error instanceof Error
