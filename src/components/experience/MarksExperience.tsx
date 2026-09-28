@@ -423,9 +423,39 @@ export default function MarksExperience({
                   </div>
                 </div>
 
-                <p className="text-[6px] tracking-[0.2em] text-white/20">
-                  PART OF MARK AT ZERO
-                </p>
+                <div>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const url =
+                        window.location.origin + "/" + selectedMark.mark_number;
+                      const shareData = {
+                        title: "MARK AT ZERO",
+                        text:
+                          "MARK #" +
+                          selectedMark.mark_number +
+                          " · " +
+                          (selectedMark.message || "A human Mark left behind."),
+                        url,
+                      };
+
+                      try {
+                        if (navigator.share) {
+                          await navigator.share(shareData);
+                        } else {
+                          await navigator.clipboard.writeText(url);
+                        }
+                      } catch {}
+                    }}
+                    className="mb-3 text-[7px] tracking-[0.22em] text-white/45 transition hover:text-white"
+                  >
+                    SHARE MARK
+                  </button>
+
+                  <p className="text-[6px] tracking-[0.2em] text-white/20">
+                    PART OF MARK AT ZERO
+                  </p>
+                </div>
               </div>
             </article>
 
