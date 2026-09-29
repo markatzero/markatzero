@@ -552,17 +552,26 @@ export default function Home() {
           </p>
 
           <div className="flex gap-4 text-[6px] tracking-[0.14em] text-white/14">
-            <button className="transition hover:text-white/40">
+            <a
+              href="/content-policy"
+              className="transition hover:text-white/40"
+            >
               CONTENT POLICY
-            </button>
+            </a>
 
-            <button className="transition hover:text-white/40">
+            <a
+              href="/privacy"
+              className="transition hover:text-white/40"
+            >
               PRIVACY
-            </button>
+            </a>
 
-            <button className="transition hover:text-white/40">
+            <a
+              href="/terms"
+              className="transition hover:text-white/40"
+            >
               TERMS
-            </button>
+            </a>
           </div>
         </div>
       </footer>
