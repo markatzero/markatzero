@@ -23,53 +23,6 @@ type RibbonProps = {
   phase: number;
 };
 
-const FLAGS: Record<string, string> = {
-  germany: "🇩🇪",
-  deutschland: "🇩🇪",
-  france: "🇫🇷",
-  italy: "🇮🇹",
-  spain: "🇪🇸",
-  portugal: "🇵🇹",
-  netherlands: "🇳🇱",
-  belgium: "🇧🇪",
-  switzerland: "🇨🇭",
-  austria: "🇦🇹",
-  poland: "🇵🇱",
-  sweden: "🇸🇪",
-  norway: "🇳🇴",
-  denmark: "🇩🇰",
-  finland: "🇫🇮",
-  ireland: "🇮🇪",
-  "united kingdom": "🇬🇧",
-  uk: "🇬🇧",
-  "united states": "🇺🇸",
-  usa: "🇺🇸",
-  canada: "🇨🇦",
-  mexico: "🇲🇽",
-  brazil: "🇧🇷",
-  argentina: "🇦🇷",
-  australia: "🇦🇺",
-  japan: "🇯🇵",
-  china: "🇨🇳",
-  india: "🇮🇳",
-  turkey: "🇹🇷",
-  türkiye: "🇹🇷",
-  egypt: "🇪🇬",
-  morocco: "🇲🇦",
-  algeria: "🇩🇿",
-  tunisia: "🇹🇳",
-  jordan: "🇯🇴",
-  lebanon: "🇱🇧",
-  bahrain: "🇧🇭",
-  "saudi arabia": "🇸🇦",
-  "united arab emirates": "🇦🇪",
-  uae: "🇦🇪",
-};
-
-function getFlag(country: string) {
-  return FLAGS[country.trim().toLowerCase()] ?? "🌍";
-}
-
 function getArc(index: number, phase: number) {
   const position = (index + phase) % 15;
   const distance = Math.abs(position - 7);
@@ -413,9 +366,15 @@ export default function MarksExperience({
                   </p>
 
                   <div className="mt-5 flex items-center gap-2">
-                    <span className="text-[16px]">
-                      {getFlag(selectedMark.country)}
-                    </span>
+                    {selectedMark.country_code && (
+                      <img
+                        src={"https://flagcdn.com/24x18/" + selectedMark.country_code.toLowerCase() + ".png"}
+                        alt=""
+                        width={24}
+                        height={18}
+                        className="h-[18px] w-6 rounded-[2px] object-cover"
+                      />
+                    )}
 
                     <span className="text-[8px] tracking-[0.12em] text-white/45">
                       {selectedMark.country.toUpperCase()}
