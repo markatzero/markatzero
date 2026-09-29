@@ -452,6 +452,13 @@ export default function MarksExperience({
                     SHARE MARK
                   </button>
 
+                  <a
+                    href={"/report?mark=" + selectedMark.mark_number}
+                    className="mb-3 ml-4 inline-block text-[7px] tracking-[0.22em] text-white/25 transition hover:text-white"
+                  >
+                    REPORT THIS MARK
+                  </a>
+
                   <p className="text-[6px] tracking-[0.2em] text-white/20">
                     PART OF MARK AT ZERO
                   </p>
