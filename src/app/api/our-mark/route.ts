@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import crypto from "crypto";
+import { isValidCountryCode } from "../../../lib/countries";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -35,7 +36,7 @@ export async function POST(request: Request) {
 
     const image = formData.get("image");
 
-    if (!country || !/^[A-Z]{2}$/.test(countryCode)) {
+    if (!country || !isValidCountryCode(countryCode)) {
       return NextResponse.json(
         { error: "Choose a valid country." },
         { status: 400 }

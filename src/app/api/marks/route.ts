@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { isValidCountryCode } from "../../../lib/countries";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY!;
@@ -27,10 +28,6 @@ function countWords(value: string) {
   }
 
   return trimmed.split(/\s+/).length;
-}
-
-function isValidCountryCode(value: string) {
-  return /^[A-Z]{2}$/.test(value);
 }
 
 export async function GET(request: Request) {
