@@ -317,7 +317,7 @@ export async function POST(request: Request) {
     uploadedPath = `pending/${crypto.randomUUID()}.${extension}`;
 
     const { error: uploadError } = await supabaseAdmin.storage
-      .from("marks")
+      .from("mark-pending")
       .upload(uploadedPath, imageValue, {
         contentType: imageValue.type,
         upsert: false,
@@ -327,10 +327,6 @@ export async function POST(request: Request) {
       throw uploadError;
     }
 
-    const { data: publicUrlData } = supabaseAdmin.storage
-      .from("marks")
-      .getPublicUrl(uploadedPath);
-
     const { data, error } = await supabaseAdmin
       .from("marks")
       .insert({
@@ -338,7 +334,8 @@ export async function POST(request: Request) {
         country,
         country_code: countryCode,
         message: message || null,
-        image_url: publicUrlData.publicUrl,
+        image_url: null,
+        pending_image_path: uploadedPath,
         status: "pending",
         payment_id: null,
         mark_number: null,
@@ -350,7 +347,7 @@ export async function POST(request: Request) {
 
     if (error) {
       await supabaseAdmin.storage
-        .from("marks")
+        .from("mark-pending")
         .remove([uploadedPath]);
 
       uploadedPath = null;
@@ -364,7 +361,7 @@ export async function POST(request: Request) {
   } catch (error) {
     if (uploadedPath) {
       await supabaseAdmin.storage
-        .from("marks")
+        .from("mark-pending")
         .remove([uploadedPath]);
     }
 

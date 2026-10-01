@@ -87,7 +87,7 @@ export async function POST(request: Request) {
     const imageBuffer = Buffer.from(await image.arrayBuffer());
 
     const { error: uploadError } = await supabaseAdmin.storage
-      .from("marks")
+      .from("mark-pending")
       .upload(storagePath, imageBuffer, {
         contentType: image.type,
         upsert: false,
@@ -97,17 +97,14 @@ export async function POST(request: Request) {
       throw uploadError;
     }
 
-    const { data: publicUrlData } = supabaseAdmin.storage
-      .from("marks")
-      .getPublicUrl(storagePath);
-
     const { data: mark, error: insertError } = await supabaseAdmin
       .from("marks")
       .insert({
         country,
         country_code: countryCode,
         message,
-        image_url: publicUrlData.publicUrl,
+        image_url: null,
+        pending_image_path: storagePath,
         status: "pending",
         mark_type: "our",
         policy_accepted_at: new Date().toISOString(),
@@ -118,7 +115,7 @@ export async function POST(request: Request) {
 
     if (insertError) {
       await supabaseAdmin.storage
-        .from("marks")
+        .from("mark-pending")
         .remove([storagePath]);
 
       throw insertError;

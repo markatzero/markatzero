@@ -41,7 +41,7 @@ export async function GET(request: Request) {
 
     const { data: mark, error } = await supabaseAdmin
       .from("marks")
-      .select("status, mark_number")
+      .select("status, mark_number, image_url")
       .eq("id", markId)
       .maybeSingle();
 
@@ -49,7 +49,7 @@ export async function GET(request: Request) {
       throw error;
     }
 
-    if (!mark || mark.status !== "paid" || !mark.mark_number) {
+    if (!mark || mark.status !== "paid" || !mark.mark_number || !mark.image_url) {
       return NextResponse.json({
         status: "waiting",
         markNumber: null,

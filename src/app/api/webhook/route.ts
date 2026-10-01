@@ -66,6 +66,80 @@ export async function POST(request: Request) {
         ) {
           throw new Error("Invalid permanent Mark number.");
         }
+
+        if (markNumber !== null) {
+          const { data: mark, error: markError } = await supabaseAdmin
+            .from("marks")
+            .select("pending_image_path")
+            .eq("id", markId)
+            .single();
+
+          if (markError) {
+            throw markError;
+          }
+
+          if (mark.pending_image_path) {
+            const pendingPath = mark.pending_image_path;
+            const fileName = pendingPath.split("/").pop();
+
+            if (!fileName) {
+              throw new Error("Invalid pending image path.");
+            }
+
+            const publicPath = `published/${markNumber}/${fileName}`;
+
+            const { data: imageData, error: downloadError } =
+              await supabaseAdmin.storage
+                .from("mark-pending")
+                .download(pendingPath);
+
+            if (downloadError) {
+              throw downloadError;
+            }
+
+            const { error: uploadError } = await supabaseAdmin.storage
+              .from("marks")
+              .upload(publicPath, imageData, {
+                contentType: imageData.type || undefined,
+                upsert: true,
+              });
+
+            if (uploadError) {
+              throw uploadError;
+            }
+
+            const { data: publicUrlData } = supabaseAdmin.storage
+              .from("marks")
+              .getPublicUrl(publicPath);
+
+            const { error: updateError } = await supabaseAdmin
+              .from("marks")
+              .update({
+                image_url: publicUrlData.publicUrl,
+                pending_image_path: null,
+              })
+              .eq("id", markId);
+
+            if (updateError) {
+              await supabaseAdmin.storage
+                .from("marks")
+                .remove([publicPath]);
+
+              throw updateError;
+            }
+
+            const { error: removeError } = await supabaseAdmin.storage
+              .from("mark-pending")
+              .remove([pendingPath]);
+
+            if (removeError) {
+              console.error(
+                "Could not remove private pending image:",
+                removeError
+              );
+            }
+          }
+        }
       }
     }
 
@@ -73,6 +147,8 @@ export async function POST(request: Request) {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Webhook failed.";
+
+    console.error("WEBHOOK ERROR:", error);
 
     return NextResponse.json({ error: message }, { status: 400 });
   }
