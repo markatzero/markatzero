@@ -334,13 +334,13 @@ export default function MarksExperience({
               onClick={previousMark}
               disabled={marks.length < 2}
               aria-label="Previous Mark"
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/20 bg-[#06090e]/85 text-[22px] text-white/65 shadow-[0_10px_30px_rgba(0,0,0,0.5)] backdrop-blur-xl transition hover:scale-105 hover:border-white/45 hover:text-white disabled:opacity-15"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full md:h-10 md:w-10 border border-white/20 bg-[#06090e]/85 text-[22px] text-white/65 shadow-[0_10px_30px_rgba(0,0,0,0.5)] backdrop-blur-xl transition hover:scale-105 hover:border-white/45 hover:text-white disabled:opacity-15"
             >
               ‹
             </button>
 
             <article className="relative flex w-full max-w-[510px] items-stretch">
-              <div className="relative z-20 h-[210px] w-[170px] shrink-0 overflow-hidden rounded-[14px] border border-white/25 bg-[#10151b] shadow-[0_22px_70px_rgba(0,0,0,0.72)] md:h-[225px] md:w-[180px]">
+              <div className="relative z-20 h-[190px] w-[145px] shrink-0 overflow-hidden rounded-[14px] border border-white/25 bg-[#10151b] shadow-[0_22px_70px_rgba(0,0,0,0.72)] md:h-[225px] md:w-[180px]">
                 <img
                   src={selectedMark.image_url}
                   alt={`Mark #${selectedMark.mark_number}`}
@@ -350,7 +350,7 @@ export default function MarksExperience({
                 <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-white/[0.035]" />
               </div>
 
-              <div className="relative z-10 -ml-3 my-3 flex min-w-0 flex-1 flex-col justify-between rounded-r-[16px] border border-l-0 border-white/[0.13] bg-[#080c12]/90 py-5 pl-8 pr-5 shadow-[0_20px_70px_rgba(0,0,0,0.65)] backdrop-blur-2xl">
+              <div className="relative z-10 -ml-3 my-3 flex min-w-0 flex-1 flex-col justify-between rounded-r-[16px] border border-l-0 border-white/[0.13] bg-[#080c12]/90 py-4 pl-7 pr-3 md:py-5 md:pl-8 md:pr-5 shadow-[0_20px_70px_rgba(0,0,0,0.65)] backdrop-blur-2xl">
                 <div>
                   <p className="text-[7px] tracking-[0.32em] text-white/40">
                     {selectedMark.mark_type === "our" ? "OUR MARK" : "MY MARK"}
@@ -430,7 +430,7 @@ export default function MarksExperience({
               onClick={nextMark}
               disabled={marks.length < 2}
               aria-label="Next Mark"
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/20 bg-[#06090e]/85 text-[22px] text-white/65 shadow-[0_10px_30px_rgba(0,0,0,0.5)] backdrop-blur-xl transition hover:scale-105 hover:border-white/45 hover:text-white disabled:opacity-15"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full md:h-10 md:w-10 border border-white/20 bg-[#06090e]/85 text-[22px] text-white/65 shadow-[0_10px_30px_rgba(0,0,0,0.5)] backdrop-blur-xl transition hover:scale-105 hover:border-white/45 hover:text-white disabled:opacity-15"
             >
               ›
             </button>
