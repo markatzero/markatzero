@@ -7,7 +7,7 @@ import MarkTypeChoice from "../components/MarkTypeChoice";
 import MarksExperience from "../components/experience/MarksExperience";
 import type { PaidMark } from "../types/mark";
 
-const PROJECT_START = new Date("2026-10-01T00:00:00");
+const PROJECT_START = new Date("2026-10-05T00:00:00");
 
 type CountrySummary = {
   country: string;
@@ -504,7 +504,7 @@ export default function Home() {
 
               <p className="mt-1.5 text-[6px] tracking-[0.18em] text-white/20">
                 {projectDay > 0
-                  ? `DAY ${projectDay} · LIVE SINCE 01 OCT 2026`
+                  ? `DAY ${projectDay} · LIVE SINCE 05 OCT 2026`
                   : "LAUNCHING 01 OCT 2026"}
               </p>
             </div>
