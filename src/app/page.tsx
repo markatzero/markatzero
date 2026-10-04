@@ -441,7 +441,7 @@ export default function Home() {
           <button
             type="button"
             onClick={() => setMarkChoiceOpen(true)}
-            className="rounded-full bg-white px-4 py-2 text-[8px] font-semibold tracking-[0.13em] text-black transition hover:scale-[1.02]"
+            className="rounded-full bg-white px-5 py-2.5 text-[8px] font-semibold tracking-[0.13em] text-black shadow-[0_0_24px_rgba(255,255,255,0.16)] ring-1 ring-white/30 transition-all duration-300 hover:-translate-y-0.5 hover:scale-[1.03] hover:shadow-[0_0_34px_rgba(255,255,255,0.28)] active:scale-[0.98]"
           >
             LEAVE YOUR MARK · €1
           </button>
@@ -475,7 +475,7 @@ export default function Home() {
           <button
             type="button"
             onClick={() => setMarkChoiceOpen(true)}
-            className="mt-4 rounded-full bg-white px-6 py-2.5 text-[8px] font-semibold tracking-[0.14em] text-black transition hover:scale-[1.02]"
+            className="mt-4 rounded-full bg-white px-7 py-3 text-[8px] font-semibold tracking-[0.14em] text-black shadow-[0_0_28px_rgba(255,255,255,0.18)] ring-1 ring-white/30 transition-all duration-300 hover:-translate-y-0.5 hover:scale-[1.03] hover:shadow-[0_0_38px_rgba(255,255,255,0.30)] active:scale-[0.98]"
           >
             LEAVE YOUR MARK · €1
           </button>
@@ -501,6 +501,12 @@ export default function Home() {
                   {marksLabel}
                 </span>
               </p>
+
+              {totalCount === 0 && (
+                <p className="mt-2 text-[7px] font-medium tracking-[0.2em] text-white/55">
+                  BE THE FIRST TO LEAVE ONE.
+                </p>
+              )}
 
               <p className="mt-1.5 text-[6px] tracking-[0.18em] text-white/20">
                 {projectDay > 0
