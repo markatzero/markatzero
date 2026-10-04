@@ -505,7 +505,7 @@ export default function Home() {
               <p className="mt-1.5 text-[6px] tracking-[0.18em] text-white/20">
                 {projectDay > 0
                   ? `DAY ${projectDay} · LIVE SINCE 05 OCT 2026`
-                  : "LAUNCHING 01 OCT 2026"}
+                  : "LAUNCHING 05 OCT 2026"}
               </p>
             </div>
 
