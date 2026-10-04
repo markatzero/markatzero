@@ -360,6 +360,26 @@ export default function MarksExperience({
                     MARK #{selectedMark.mark_number.toLocaleString()}
                   </p>
 
+                  {(() => {
+                    const n = selectedMark.mark_number;
+                    const label =
+                      n === 1 ? "THE BEGINNING" :
+                      n <= 10 ? "FIRST TEN" :
+                      n < 100 ? "FIRST HUNDRED" :
+                      n === 100 ? "MILESTONE 100" :
+                      n === 1000 ? "MILESTONE 1K" :
+                      n === 10000 ? "MILESTONE 10K" :
+                      n === 100000 ? "MILESTONE 100K" :
+                      n === 1000000 ? "MILESTONE 1M" :
+                      null;
+
+                    return label ? (
+                      <p className="mt-1.5 text-[7px] font-medium tracking-[0.24em] text-white/65">
+                        {label}
+                      </p>
+                    ) : null;
+                  })()}
+
                   <p className="mt-4 text-[14px] leading-6 text-white/85">
                     {selectedMark.message ||
                       "A human Mark left behind."}
